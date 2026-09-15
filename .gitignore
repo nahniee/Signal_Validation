@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+data/*.db
+data/*.db-journal
+data/cache/
+data/raw/*.csv
+data/raw/*.json
+models/*.h5
+models/*.keras
+reports/figures/*.png
+.env
+.DS_Store
+.ipynb_checkpoints/

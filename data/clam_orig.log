@@ -1,0 +1,24 @@
+2026-09-14 22:44:17.921841: I metal_plugin/src/device/metal_device.cc:1154] Metal device set to: Apple M3 Pro
+2026-09-14 22:44:17.921915: I metal_plugin/src/device/metal_device.cc:296] systemMemory: 18.00 GB
+2026-09-14 22:44:17.921926: I metal_plugin/src/device/metal_device.cc:313] maxCacheSize: 6.66 GB
+2026-09-14 22:44:17.921946: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:305] Could not identify NUMA node of platform GPU ID 0, defaulting to 0. Your kernel may not have been built with NUMA support.
+2026-09-14 22:44:17.921960: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:271] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 0 MB memory) -> physical PluggableDevice (device: 0, name: METAL, pci bus id: <undefined>)
+clam_orig: 613 dates to score
+2026-09-14 22:45:03.931800: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+  [1/613] 2015-01-23: 1267 tickers
+  [11/613] 2015-04-02: 1293 tickers
+  [21/613] 2015-06-12: 1269 tickers
+  [31/613] 2015-08-21: 1298 tickers
+  [41/613] 2015-10-30: 1305 tickers
+  [51/613] 2016-01-08: 1333 tickers
+  [61/613] 2016-03-18: 1327 tickers
+  [71/613] 2016-05-27: 1313 tickers
+  [81/613] 2016-08-05: 1336 tickers
+  [91/613] 2016-10-14: 1326 tickers
+  [101/613] 2016-12-23: 1465 tickers
+  [111/613] 2017-03-03: 1433 tickers
+  [121/613] 2017-05-12: 1439 tickers
+  [131/613] 2017-07-21: 1417 tickers
+  [141/613] 2017-09-29: 1463 tickers
+  [151/613] 2017-12-08: 1474 tickers
+  [161/613] 2018-02-16: 1558 tickers
