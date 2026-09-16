@@ -3,6 +3,7 @@ pandas>=2.2
 numpy>=1.26,<2
 scipy>=1.13
 scikit-learn>=1.5
+duckdb>=1.1
 tensorflow>=2.16    # CLAM inference / retrain only
 joblib
 matplotlib

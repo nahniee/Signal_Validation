@@ -82,10 +82,11 @@ def run(con, name: str, start: str | None = None, end: str | None = None) -> Non
     model, scaler = load(name)
     X, didx, tidx = feature_matrix(con)
     dates = features.rebalance_dates(con)
-    done = set(db.read(con, "SELECT DISTINCT date FROM signals WHERE model=?", (name,))["date"])
+    done = set(db.read(con, "SELECT DISTINCT date FROM signals WHERE model = ?", [name])["date"])
+    start, end = (pd.Timestamp(x) if x else None for x in (start, end))
     todo = [d for d in dates if d not in done and (not start or d >= start) and (not end or d <= end)]
     print(f"{name}: {len(todo)} dates to score", flush=True)
-    trad = db.read(con, "SELECT date, ticker FROM panel WHERE tradable = 1")
+    trad = db.read(con, "SELECT date, ticker FROM panel WHERE tradable")
     trad_by_date = trad.groupby("date")["ticker"].apply(set).to_dict()
     for i, d in enumerate(todo):
         W, tick = windows_for_date(X, didx, tidx, d, trad_by_date.get(d, set()))
@@ -95,7 +96,7 @@ def run(con, name: str, start: str | None = None, end: str | None = None) -> Non
         df = pd.DataFrame({"date": d, "ticker": tick, "model": name, "score": s})
         db.write_df(con, df, "signals")
         if i % 10 == 0:
-            print(f"  [{i+1}/{len(todo)}] {d}: {len(tick)} tickers", flush=True)
+            print(f"  [{i+1}/{len(todo)}] {d.date()}: {len(tick)} tickers", flush=True)
 
 
 if __name__ == "__main__":

@@ -12,8 +12,11 @@ candidates and isolates selection skill):
    strategies, correcting for non-normality (skew, kurtosis) and sample length.
 3. Cross-sectional permutation null: shuffle scores across tickers within each
    rebalance date (keeps every return, every date, the same universe and the
-   same top-N/cost mechanics) and rebuild the portfolio. The empirical p-value
-   is the share of permuted Sharpes >= observed.
+   same top-N mechanics) and rebuild the portfolio. The empirical p-value is
+   the share of permuted Sharpes >= observed. Compared on *gross* returns: a
+   shuffled signal turns the book over ~100% a week, so net of costs the null
+   would be dragged far below zero and a persistent signal would pass on cost
+   savings alone rather than on selection skill.
 """
 import numpy as np
 import pandas as pd
@@ -32,8 +35,8 @@ def sharpe(r: pd.Series | np.ndarray, ann: int = ANN) -> float:
 
 def active_returns(con, strategy: str, bench: str = "universe_ew") -> pd.Series:
     df = db.read(con, """SELECT s.date, s.ret_net - b.ret_net AS active
-                         FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = :b
-                         WHERE s.strategy = :s ORDER BY s.date""", {"s": strategy, "b": bench})
+                         FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = $b
+                         WHERE s.strategy = $s ORDER BY s.date""", {"s": strategy, "b": bench})
     return df.set_index("date")["active"]
 
 
@@ -94,10 +97,10 @@ def deflated_sharpe(r: pd.Series, trial_sharpes_ann: list[float], n_trials: int 
 # ---------------------------------------------------------------- 3. permutation
 def permutation_null(con, model: str, n_perm: int = 500, seed: int = 0, bench: str = "universe_ew") -> dict:
     panel = backtest._panel(con, model).dropna(subset=["score"])
-    ew = db.read(con, "SELECT date, ret_net FROM portfolio_returns WHERE strategy = :b", {"b": bench}) \
-           .set_index("date")["ret_net"]
+    ew = db.read(con, "SELECT date, ret_gross FROM portfolio_returns WHERE strategy = $b", {"b": bench}) \
+           .set_index("date")["ret_gross"]
     obs_pr = backtest.portfolio_returns(backtest.top_n_weights(panel))
-    obs = sharpe((obs_pr.set_index("date")["ret_net"] - ew).dropna())
+    obs = sharpe((obs_pr.set_index("date")["ret_gross"] - ew).dropna())
     rng = np.random.default_rng(seed)
     g = panel.groupby("date", sort=False)
     null = np.empty(n_perm)
@@ -105,19 +108,19 @@ def permutation_null(con, model: str, n_perm: int = 500, seed: int = 0, bench: s
         # shuffle scores within date: same universe, returns, costs; signal-return link broken
         panel["score_perm"] = g["score"].transform(lambda s: rng.permutation(s.values))
         pr = backtest.portfolio_returns(backtest.top_n_weights(panel, score_col="score_perm"))
-        null[i] = sharpe((pr.set_index("date")["ret_net"] - ew).dropna())
+        null[i] = sharpe((pr.set_index("date")["ret_gross"] - ew).dropna())
     p = float((null >= obs).mean())
     return {"statistic": obs, "ci_low": float(np.percentile(null, 2.5)), "ci_high": float(np.percentile(null, 97.5)),
             "p_value": p, "verdict": "PASS" if p < 0.05 else "FAIL",
-            "detail": f"cross-sectional permutation, n={n_perm}; null mean={null.mean():.2f} sd={null.std():.2f}",
+            "detail": f"cross-sectional permutation on gross active return, n={n_perm}; "
+                      f"null mean={null.mean():.2f} sd={null.std():.2f}",
             "null": null}
 
 
 def save_result(con, model: str, test: str, res: dict) -> None:
     con.execute("INSERT OR REPLACE INTO validation_results(model,test,statistic,ci_low,ci_high,p_value,verdict,detail) "
                 "VALUES (?,?,?,?,?,?,?,?)",
-                (model, test, res["statistic"], res["ci_low"], res["ci_high"], res["p_value"], res["verdict"], res["detail"]))
-    con.commit()
+                [model, test, res["statistic"], res["ci_low"], res["ci_high"], res["p_value"], res["verdict"], res["detail"]])
 
 
 def run_all(con, models: list[str], n_trials: int | None = None, n_perm: int = 500) -> pd.DataFrame:

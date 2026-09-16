@@ -1,89 +1,97 @@
--- Signal Validation Framework: core schema (SQLite)
--- Convention: dates stored as ISO text (YYYY-MM-DD); all money in USD.
+-- Signal Validation Framework: core schema (DuckDB)
+-- Conventions: real DATE columns (not text); all money in USD; one row = one observation.
+-- Tables flow top-down: universe -> prices -> panel -> signals -> portfolio_returns
+--                       -> monitoring / gate_decisions / validation_results (report inputs)
 
+-- Snapshot of the top-N US equities by market cap on UNIVERSE_ASOF.
 CREATE TABLE IF NOT EXISTS universe (
-    ticker        TEXT PRIMARY KEY,
-    name          TEXT,
-    exchange      TEXT,
-    sector        TEXT,
-    industry      TEXT,
-    market_cap    REAL,
+    ticker        VARCHAR PRIMARY KEY,
+    name          VARCHAR,
+    exchange      VARCHAR,
+    sector        VARCHAR,
+    industry      VARCHAR,
+    market_cap    DOUBLE,
     rank_by_mcap  INTEGER,
-    asof_date     TEXT NOT NULL
+    asof_date     DATE NOT NULL
 );
 
+-- Daily OHLCV from Yahoo Finance. adj_close is split/dividend adjusted; the others are raw.
 CREATE TABLE IF NOT EXISTS prices (
-    date       TEXT NOT NULL,
-    ticker     TEXT NOT NULL,
-    open       REAL, high REAL, low REAL, close REAL,
-    adj_close  REAL,
-    volume     REAL,
+    date       DATE NOT NULL,
+    ticker     VARCHAR NOT NULL,
+    open       DOUBLE,
+    high       DOUBLE,
+    low        DOUBLE,
+    close      DOUBLE,
+    adj_close  DOUBLE,
+    volume     DOUBLE,
     PRIMARY KEY (ticker, date)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS ix_prices_date ON prices(date);
 
--- One row per (rebalance date, ticker): model inputs + realised forward return.
+-- One row per (rebalance date, ticker): tradability flag + realised forward returns.
+-- Built by sql/queries/build_panel.sql.
 CREATE TABLE IF NOT EXISTS panel (
-    date         TEXT NOT NULL,      -- rebalance date (Friday close)
-    ticker       TEXT NOT NULL,
-    close        REAL,
-    adj_close    REAL,
-    adv20_usd    REAL,               -- 20d avg dollar volume (liquidity filter)
-    tradable     INTEGER,            -- 1 if passes MIN_PRICE / MIN_ADV_USD
-    ret_fwd_1w   REAL,               -- next-week total return, rebalance close -> next rebalance close
-    ret_fwd_1w_lag1 REAL,            -- same but entered one trading day later (execution-lag sensitivity)
-    ret_fwd_13w  REAL,               -- 65-trading-day forward return (candidate models' horizon)
+    date             DATE NOT NULL,     -- rebalance date (last trading day of the week)
+    ticker           VARCHAR NOT NULL,
+    close            DOUBLE,
+    adj_close        DOUBLE,
+    adv20_usd        DOUBLE,            -- 20-day average dollar volume (liquidity filter)
+    tradable         BOOLEAN,           -- passes MIN_PRICE and MIN_ADV_USD
+    ret_fwd_1w       DOUBLE,            -- next-week total return, rebalance close -> next rebalance close
+    ret_fwd_1w_lag1  DOUBLE,            -- same but entered one trading day later (execution-lag sensitivity)
+    ret_fwd_13w      DOUBLE,            -- 65-trading-day forward return (candidate models' horizon)
     PRIMARY KEY (date, ticker)
-) WITHOUT ROWID;
+);
 
--- Raw candidate model outputs. One row per (date, ticker, model).
+-- Raw candidate model outputs. Higher score = more bullish.
 CREATE TABLE IF NOT EXISTS signals (
-    date     TEXT NOT NULL,
-    ticker   TEXT NOT NULL,
-    model    TEXT NOT NULL,          -- 'momentum' | 'gbm' | 'clam_orig' | 'clam_2021'
-    score    REAL,                   -- raw model score (higher = more bullish)
+    date     DATE NOT NULL,
+    ticker   VARCHAR NOT NULL,
+    model    VARCHAR NOT NULL,          -- 'momentum' | 'gbm' | 'gbm_expected' | 'clam_orig' | 'clam_2021'
+    score    DOUBLE,
     PRIMARY KEY (model, date, ticker)
-) WITHOUT ROWID;
+);
 
--- Weekly portfolio returns per strategy (net of costs).
+-- Weekly portfolio returns per strategy, net of transaction costs.
 CREATE TABLE IF NOT EXISTS portfolio_returns (
-    date       TEXT NOT NULL,
-    strategy   TEXT NOT NULL,        -- model name, or '<model>_gated', or 'benchmark'
-    ret_gross  REAL,
-    ret_net    REAL,
-    turnover   REAL,
+    date       DATE NOT NULL,
+    strategy   VARCHAR NOT NULL,        -- model name, '<model>_lag1', '<model>_gated', 'benchmark_spy', 'universe_ew'
+    ret_gross  DOUBLE,
+    ret_net    DOUBLE,
+    turnover   DOUBLE,
     n_held     INTEGER,
     PRIMARY KEY (strategy, date)
-) WITHOUT ROWID;
+);
 
--- Rolling monitoring metrics per model per week.
+-- Rolling model-monitoring metrics, long format (one row per model/metric/week).
 CREATE TABLE IF NOT EXISTS monitoring (
-    date      TEXT NOT NULL,
-    model     TEXT NOT NULL,
-    metric    TEXT NOT NULL,         -- 'psi' | 'ks' | 'auc' | 'rolling_sharpe' | 'drawdown' | 'calib_slope'
-    value     REAL,
+    date      DATE NOT NULL,
+    model     VARCHAR NOT NULL,
+    metric    VARCHAR NOT NULL,         -- 'psi_score' | 'psi_input' | 'ks_1w' | 'auc_1w' | 'calib_slope' | 'rolling_sharpe' | 'drawdown' ...
+    value     DOUBLE,
     PRIMARY KEY (model, metric, date)
-) WITHOUT ROWID;
+);
 
--- Kill-switch decisions.
+-- Kill-switch decisions: was the signal trusted this week, and why not if not.
 CREATE TABLE IF NOT EXISTS gate_decisions (
-    date      TEXT NOT NULL,
-    model     TEXT NOT NULL,
-    gate_on   INTEGER NOT NULL,      -- 1 = signal trusted this week
-    reason    TEXT,
+    date      DATE NOT NULL,
+    model     VARCHAR NOT NULL,
+    gate_on   BOOLEAN NOT NULL,
+    reason    VARCHAR,
     PRIMARY KEY (model, date)
-) WITHOUT ROWID;
+);
 
 -- Validation summary (one row per test per model) feeding the report.
 CREATE TABLE IF NOT EXISTS validation_results (
-    model      TEXT NOT NULL,
-    test       TEXT NOT NULL,
-    statistic  REAL,
-    ci_low     REAL,
-    ci_high    REAL,
-    p_value    REAL,
-    verdict    TEXT,
-    detail     TEXT,
-    run_at     TEXT DEFAULT CURRENT_TIMESTAMP,
+    model      VARCHAR NOT NULL,
+    test       VARCHAR NOT NULL,        -- 'bootstrap_sharpe_ci' | 'deflated_sharpe' | 'permutation_null'
+    statistic  DOUBLE,
+    ci_low     DOUBLE,
+    ci_high    DOUBLE,
+    p_value    DOUBLE,
+    verdict    VARCHAR,                 -- 'PASS' | 'FAIL'
+    detail     VARCHAR,
+    run_at     TIMESTAMP DEFAULT current_timestamp,
     PRIMARY KEY (model, test)
 );

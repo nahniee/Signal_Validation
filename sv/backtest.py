@@ -13,8 +13,8 @@ from sv import db
 
 def _panel(con, model: str | None = None) -> pd.DataFrame:
     q = """SELECT p.date, p.ticker, p.ret_fwd_1w, p.ret_fwd_1w_lag1, s.score
-           FROM panel p LEFT JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = :m
-           WHERE p.tradable = 1"""
+           FROM panel p LEFT JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = $m
+           WHERE p.tradable"""
     return db.read(con, q, {"m": model})
 
 
@@ -49,11 +49,11 @@ def run_model(con, model: str, strategy: str | None = None, ret_col: str = "ret_
 
 
 def run_benchmarks(con) -> pd.DataFrame:
-    spy = db.read(con, "SELECT date, ret_fwd_1w AS ret_gross FROM panel WHERE ticker = :b ORDER BY date",
+    spy = db.read(con, "SELECT date, ret_fwd_1w AS ret_gross FROM panel WHERE ticker = $b ORDER BY date",
                   {"b": config.BENCHMARK})
     spy = spy.assign(ret_net=spy.ret_gross, turnover=0.0, n_held=1, strategy="benchmark_spy")
     ew = db.read(con, """SELECT date, AVG(ret_fwd_1w) AS ret_gross, COUNT(*) AS n_held
-                         FROM panel WHERE tradable = 1 GROUP BY date ORDER BY date""")
+                         FROM panel WHERE tradable GROUP BY date ORDER BY date""")
     ew = ew.assign(ret_net=ew.ret_gross, turnover=0.0, strategy="universe_ew")
     return pd.concat([spy, ew], ignore_index=True)
 
@@ -61,7 +61,7 @@ def run_benchmarks(con) -> pd.DataFrame:
 def save(con, pr: pd.DataFrame) -> None:
     pr = pr.dropna(subset=["ret_net"])
     for s in pr.strategy.unique():
-        con.execute("DELETE FROM portfolio_returns WHERE strategy = ?", (s,))
+        con.execute("DELETE FROM portfolio_returns WHERE strategy = ?", [s])
     db.write_df(con, pr[["date", "strategy", "ret_gross", "ret_net", "turnover", "n_held"]], "portfolio_returns")
 
 
@@ -83,7 +83,7 @@ def summary(pr: pd.DataFrame, bench: pd.Series | None = None) -> dict:
 if __name__ == "__main__":
     import sys
     con = db.connect()
-    models = sys.argv[1:] or [m for (m,) in con.execute("SELECT DISTINCT model FROM signals")]
+    models = sys.argv[1:] or [m for (m,) in con.execute("SELECT DISTINCT model FROM signals").fetchall()]
     bench = run_benchmarks(con)
     save(con, bench)
     ew = bench[bench.strategy == "universe_ew"].set_index("date")["ret_net"]

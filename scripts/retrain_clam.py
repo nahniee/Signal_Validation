@@ -11,8 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import config
-QMR = Path.home() / "Quant_Model_Research"
-sys.path.insert(0, str(QMR))
+sys.path.insert(0, str(config.QMR_DIR))
 import clam_model  # noqa: E402  (original training code, unmodified)
 
 out = ROOT / "models"

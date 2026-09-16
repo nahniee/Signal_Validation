@@ -58,13 +58,13 @@ def auc(score: np.ndarray, y: np.ndarray) -> float:
 def load_scored_panel(con, model: str) -> pd.DataFrame:
     return db.read(con, """
         SELECT p.date, p.ticker, s.score, p.ret_fwd_1w, p.ret_fwd_13w
-        FROM panel p JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = :m
-        WHERE p.tradable = 1 ORDER BY p.date""", {"m": model})
+        FROM panel p JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = $m
+        WHERE p.tradable ORDER BY p.date""", {"m": model})
 
 
 def realised_vol_panel(con) -> pd.DataFrame:
     """Trailing 252d realised vol per (rebalance date, ticker) via SQL window function."""
-    return db.read(con, (db.SQL_DIR / "queries" / "realised_vol.sql").read_text())
+    return db.run_sql_file(con, "realised_vol")
 
 
 # ------------------------------------------------------------------ rolling
@@ -72,7 +72,7 @@ def rolling_metrics(con, model: str) -> pd.DataFrame:
     df = load_scored_panel(con, model)
     df["y1"] = (df.ret_fwd_1w > df.groupby("date").ret_fwd_1w.transform("median")).astype(float)
     df["y13"] = (df.ret_fwd_13w > df.groupby("date").ret_fwd_13w.transform("median")).astype(float)
-    dates = sorted(df.date.unique())
+    dates = sorted(df.date.drop_duplicates().tolist())
     dev = df[df.date.isin(dates[:DEV_WEEKS])]
     edges = np.unique(np.quantile(dev.score, np.linspace(0, 1, config.PSI_BUCKETS + 1)))
 
@@ -106,8 +106,8 @@ def rolling_metrics(con, model: str) -> pd.DataFrame:
 
 def portfolio_metrics(con, strategy: str, bench: str = "universe_ew") -> pd.DataFrame:
     pr = db.read(con, """SELECT s.date, s.ret_net, s.ret_net - b.ret_net AS active
-                         FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = :b
-                         WHERE s.strategy = :s ORDER BY s.date""", {"s": strategy, "b": bench}).set_index("date")
+                         FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = $b
+                         WHERE s.strategy = $s ORDER BY s.date""", {"s": strategy, "b": bench}).set_index("date")
     rs = pr.active.rolling(W).mean() / pr.active.rolling(W).std() * np.sqrt(52)
     eq = (1 + pr.ret_net).cumprod()
     dd = eq / eq.cummax() - 1
@@ -121,7 +121,7 @@ def portfolio_metrics(con, strategy: str, bench: str = "universe_ew") -> pd.Data
 
 def save(con, m: pd.DataFrame) -> None:
     for model in m.model.unique():
-        con.execute("DELETE FROM monitoring WHERE model = ?", (model,))
+        con.execute("DELETE FROM monitoring WHERE model = ?", [model])
     db.write_df(con, m.dropna(subset=["value"])[["date", "model", "metric", "value"]], "monitoring")
 
 

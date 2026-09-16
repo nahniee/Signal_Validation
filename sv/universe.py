@@ -47,12 +47,13 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop_duplicates(subset=["ticker"])
     df = df.head(config.UNIVERSE_SIZE).reset_index(drop=True)
     df["rank_by_mcap"] = df.index + 1
-    df["asof_date"] = config.UNIVERSE_ASOF
+    df["asof_date"] = pd.Timestamp(config.UNIVERSE_ASOF)
     return df.drop(columns=["quoteType"])
 
 
 def build(con) -> pd.DataFrame:
     raw = fetch_screener()
+    config.RAW_DIR.mkdir(parents=True, exist_ok=True)
     (config.RAW_DIR / "screener_raw.json").write_text(raw.to_json(orient="records"))
     uni = clean(raw)
     con.execute("DELETE FROM universe")

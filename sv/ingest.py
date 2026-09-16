@@ -1,11 +1,10 @@
 """Download daily OHLCV (+ adjusted close) from Yahoo Finance into the prices table.
 
 Batches of tickers are downloaded together and stored long-format. Re-runnable:
-existing (ticker, date) rows are replaced (INSERT OR REPLACE).
+existing (ticker, date) rows are replaced (upsert on the primary key).
 """
 import sys
 import time
-import numpy as np
 import pandas as pd
 import yfinance as yf
 import config
@@ -33,16 +32,13 @@ def download_batch(tickers: list[str], start: str, end: str | None) -> pd.DataFr
     long = raw[FIELDS].stack(level=1, future_stack=True).reset_index()
     long.columns = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]
     long = long.dropna(subset=["close"])
-    long["date"] = pd.to_datetime(long["date"]).dt.strftime("%Y-%m-%d")
+    long["date"] = pd.to_datetime(long["date"]).dt.normalize()
     return long
 
 
 def upsert(con, df: pd.DataFrame) -> None:
-    con.executemany(
-        "INSERT OR REPLACE INTO prices(date,ticker,open,high,low,close,adj_close,volume) VALUES (?,?,?,?,?,?,?,?)",
-        df[["date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]]
-          .replace({np.nan: None}).itertuples(index=False, name=None))
-    con.commit()
+    db.write_df(con, df[["date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]],
+                "prices", replace=True)
 
 
 def ingest(con, tickers: list[str], start=config.PRICE_START, end=config.PRICE_END) -> None:
@@ -68,5 +64,5 @@ if __name__ == "__main__":
         tickers = [t for t in tickers if t not in done]
         print(f"resume: {len(tickers)} tickers remaining")
     ingest(con, tickers)
-    s = db.read(con, "SELECT COUNT(*) n, COUNT(DISTINCT ticker) k, MIN(date) d0, MAX(date) d1 FROM prices")
+    s = db.read(con, "SELECT COUNT(*) AS n, COUNT(DISTINCT ticker) AS k, MIN(date) AS d0, MAX(date) AS d1 FROM prices")
     print(s)
