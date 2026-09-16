@@ -27,6 +27,13 @@ findings, limitations, monitoring plan and prohibited-use conditions.
 | `clam_orig` | `Quant_Model_Research/quarterly_model.h5` | deployed CNN-LSTM-Attention model, weights as shipped |
 | `clam_2021` | `scripts/retrain_clam.py` | same training code with the window cut at 2021-12-31, to obtain an honest out-of-time period |
 | `momentum` | textbook 12-1 momentum | untuned benchmark rule: a complex model that cannot beat it is not approved |
+| `gbm_weekly` | `Long_Term_Trading/gbm_weekly.py` (round 2) | redeveloped GBM: 5-day horizon, closed-form score; best of 6 variants on the development sample |
+| `clam_weekly_*` | `Quant_Model_Research/clam_weekly.py` (round 2) | redeveloped CLAM: per-ticker sequences, training cut 2021-12-31, weekly scalar target; two variants retained |
+
+**Outcome so far:** two validation rounds, eight candidate variants, none approved. Round 2 showed the GBM
+defect was an implementation error (the fixed model passes the noise tests but does not beat the benchmark)
+and that the CLAM approach yields no weekly signal even after its data-construction defect is repaired.
+Details in `reports/validation_report.md` §12 and `notebooks/05_round2.ipynb`.
 
 ## Layout
 
@@ -36,7 +43,7 @@ sql/schema.sql            DuckDB tables: universe -> prices -> panel -> signals 
 sql/queries/*.sql         set-based work lives in SQL: rebalance panel, realised vol, PSI, AUC via ranks, drawdown-based performance summary
 sv/                       Python library: ingest, features, backtest, candidates/, validation/
 scripts/                  long-running batch jobs (candidate scoring, CLAM retrain, GPU env)
-notebooks/00..04          validation workpapers: data quality, Q1, Q2, Q3, findings
+notebooks/00..05          validation workpapers: data quality, Q1, Q2, Q3, findings, round-2 revalidation
 reports/                  validation report + figures
 ```
 
@@ -64,6 +71,20 @@ CLAM needs the original artefacts next to this repo (`../Quant_Model_Research/qu
 ```
 
 Then re-run backtest / overfit / monitoring / gate with the CLAM model names as arguments.
+
+Round 2 (redeveloped weekly models):
+
+```bash
+.venv/bin/python scripts/develop_gbm_weekly.py                 # 6 GBM-weekly variants, picks one on the dev sample
+(cd ../Quant_Model_Research && ../Signal_Validation/.venv/bin/python clam_weekly.py cs_demeaned)
+(cd ../Quant_Model_Research && ../Signal_Validation/.venv/bin/python clam_weekly.py cs_rank small)
+.venv/bin/python -m sv.candidates.clam_weekly cs_demeaned
+.venv/bin/python -m sv.candidates.clam_weekly cs_rank_small
+sh scripts/revalidate.sh
+```
+
+DuckDB allows one writing process at a time: run the CLAM trainer (which reads the database) before or
+after, not during, a scoring job.
 
 ## Data caveats (carried into the report)
 

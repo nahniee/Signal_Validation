@@ -6,7 +6,7 @@
 | **Model owner** | Long_Term_Trading / Quant_Model_Research (developer: the author, in an earlier role) |
 | **Validator** | Signal_Validation — independent re-implementation; no model code modified or tuned |
 | **Data** | 3,000 US equities (top by market cap, snapshot 2026-09-15), daily prices 2013-01-02 → 2026-09-14, weekly rebalance 2015-01-02 → 2026-09-12 (612 weeks) |
-| **Report date** | 2026-09-15 |
+| **Report date** | 2026-09-15 (round 1) · 2026-09-16 (round 2 revalidation, §12) |
 | **Standard followed** | SR 11-7 / OCC 2011-12 structure: purpose, data, methodology, results, findings, limitations, monitoring, conditions of use, decision |
 
 ## 1. Executive summary and decision
@@ -17,10 +17,13 @@
 | `gbm_expected` | 0 / 3 | AUC 0.500, calibration slope −0.03 | gate off 63% of weeks | **Not approved** — no evidence of skill |
 | `gbm` (deployed) | 0 / 3 | AUC 0.502 | gate off 92% of weeks | **Not approved** — implementation defect (F1) |
 | `clam_orig` | — | — | — | **Not approved** — cannot be validated (F3, F4) |
-| `clam_2021` | — | — | — | **Pending** — retrained twin not yet scored on this machine |
+| `gbm_weekly` (round 2) | 2 / 3 (fails Deflated Sharpe) | AUC 0.507, calibration slope 0.74 | gate destroys return (CAGR 19.3% → −2.6%) | **Not approved** — real but does not beat the momentum benchmark (§12) |
+| `clam_weekly_*` (round 2) | 0 / 3 | AUC 0.50 | gate off 61–92% of weeks | **Not approved** — two redevelopment variants, no evidence of skill (§12) |
 
-Of five candidate models, none is approved for production use; the untuned momentum rule is retained
-as the benchmark that any future model must beat. The most valuable outputs are five findings
+Across two rounds and eight candidate variants, none is approved for production use; the untuned momentum
+rule is retained as the benchmark that any future model must beat. The round-2 redevelopment (§12) confirmed
+that the GBM defect was an implementation error (fixed model passes the noise tests) and that the CLAM
+approach does not produce a usable weekly signal even after its data-construction defect is repaired. The most valuable outputs are five findings
 (§7) that came from reading and reproducing the deployed code rather than from any single statistic.
 
 ## 2. Purpose and scope
@@ -221,6 +224,73 @@ that produced this report, so the monitoring pack is a query, not a re-implement
 3. **`momentum`**: document the execution assumption; investigate the first-session concentration (F5) before any live use.
 4. **Kill switch**: add a leading indicator (e.g. AUC deterioration with a shorter window) alongside the drawdown rule, and re-test champion vs challenger.
 
+## 12. Round 2 — revalidation after redevelopment (2026-09-16)
+
+Following §11, the model owner redeveloped both rejected models for a **weekly** horizon. The validator's
+role in round 2 was unchanged: same backtest engine, same three questions, same out-of-time window, and
+every variant the developer tried is counted as a trial in the Deflated Sharpe Ratio (`N_TRIALS_DSR = 10`:
+3 round-1 candidates + 6 GBM variants + 1 CLAM variant retained after 3 attempts).
+
+### 12.1 What the developer changed
+
+| model | change | developer-side selection (development sample < 2022 only) |
+|---|---|---|
+| `gbm_weekly` | horizon 65 → 5 days; the single Monte-Carlo path replaced by the closed-form expectation (F1); lookback re-chosen | 6 variants (lookback 63 / 126 / 252 × expected / prob-up); best development Sharpe → `gbm_w_126_expected` |
+| `clam_weekly_cs_demeaned` | sequences built per ticker (F3); training cut at 2021-12-31 (F4); horizon 5 days; scalar target = next-5-day log return minus that week's cross-sectional mean; top-500 training universe | validation rank IC 0.014 |
+| `clam_weekly_cs_rank_small` | as above with a within-week percentile-rank target and a smaller network | validation rank IC 0.016 |
+| *(discarded)* | raw-return target (IC −0.008); weekly-bar input (collapsed to a constant) | — |
+
+### 12.2 Results
+
+Q1, full sample 2015-01 → 2026-09, active return vs universe (DSR hurdle at N = 10 is SR₀ = 0.86):
+
+| model | active Sharpe [95% CI] | bootstrap | permutation p | DSR | passed |
+|---|---|---|---|---|---|
+| `momentum` (benchmark) | 0.65 [0.18, 1.10] | PASS | 0.004 PASS | 0.24 FAIL | 2 / 3 |
+| **`gbm_weekly`** | 0.49 [CI > 0] | **PASS** | **0.026 PASS** | 0.11 FAIL | **2 / 3** |
+| `gbm_expected` (round 1) | 0.37 | FAIL | 0.080 FAIL | 0.05 FAIL | 0 / 3 |
+| `gbm` (deployed) | −0.50 | FAIL | 0.226 FAIL | 0.00 FAIL | 0 / 3 |
+| `clam_weekly_cs_rank_small` | 0.04 | FAIL | 0.106 FAIL | 0.00 FAIL | 0 / 3 |
+| `clam_weekly_cs_demeaned` | −0.68 | FAIL | 0.704 FAIL | 0.00 FAIL | 0 / 3 |
+
+Out-of-time 2022-01 → 2026-09:
+
+| strategy | CAGR | vol | Sharpe | max DD | one-day execution lag |
+|---|---|---|---|---|---|
+| `momentum` | 35.5% | 36.3% | 1.02 | −29.7% | 19.2% |
+| `gbm_weekly` | 19.3% | 36.2% | 0.67 | −43.4% | 8.3% |
+| `gbm_expected` | 17.5% | 35.6% | 0.63 | −37.5% | 11.4% |
+| `clam_weekly_cs_rank_small` | 10.7% | 22.5% | 0.57 | −24.1% | 9.1% |
+| `clam_weekly_cs_demeaned` | −0.1% | 26.8% | 0.13 | −39.0% | — |
+| universe equal-weight | 11.6% | 19.2% | 0.67 | −21.6% | — |
+
+![fig4](figures/fig4_round2_oot.png)
+
+Monitoring: no candidate exceeds AUC 0.53 in any calendar year (SQL cross-check); `gbm_weekly` is the only
+model with a meaningful calibration slope at the 13-week horizon (0.74). The gate switches `gbm_weekly`
+off 59% of weeks and turns its out-of-time CAGR from 19.3% to −2.6%, confirming the round-1 conclusion
+that the rule set as specified is not a usable control.
+
+### 12.3 Findings added in round 2
+
+| # | model | severity | finding |
+|---|---|---|---|
+| F8 | `gbm_weekly` | Medium | The fixed model is statistically distinguishable from noise (bootstrap and permutation pass) but its out-of-time Sharpe (0.67) equals the equal-weighted universe and trails the untuned benchmark (1.02) with a deeper drawdown. Reason for rejection moves from *implementation defect* to *no value over benchmark*. |
+| F9 | `clam_weekly_*` | High | After repairing F3/F4 and trying four target/input variants on a 478-ticker, 142k-window training set, the best validation rank IC is 0.016 and out-of-time performance is indistinguishable from the universe. The limitation is the approach — OHLCV sequences alone carry no exploitable weekly cross-sectional signal at this scale — not the implementation. |
+| F10 | process | Low | Multiple-testing accounting: raising the trial count from 3 to 10 lifts the DSR hurdle from SR₀ = 0.51 to 0.86 and fails every candidate including the benchmark. Development iterations must be logged so the validator can count them. |
+
+### 12.4 Decision
+
+| model | round 1 | round 2 |
+|---|---|---|
+| `momentum` | conditionally approved as benchmark | unchanged |
+| `gbm` → `gbm_weekly` | not approved (F1) | **not approved** — passes noise tests, fails to beat benchmark (F8); may be resubmitted with a documented economic rationale and a smaller trial count |
+| `clam_orig` → `clam_weekly_*` | not approved (F3, F4) | **not approved** — recommend discontinuing the sequence-model approach for weekly selection (F9) |
+
+Recommendation to the owner: stop iterating on CLAM; if GBM-weekly is pursued, its only demonstrated
+content is trailing mean return (F2), so it should be compared against — or merged into — the momentum
+benchmark rather than maintained as a separate model.
+
 ## Appendix A — assumptions (`config.py`)
 
 | assumption | value |
@@ -235,11 +305,11 @@ that produced this report, so the monitoring pack is a query, not a re-implement
 | GBM | 504-day lookback, 65-day horizon |
 | CLAM | 252-day input, 65-day horizon; original weights through 2025-08-22; retrain cut 2021-12-31 |
 | bootstrap | stationary, mean block 13 weeks, 5,000 draws |
-| DSR trials | 3 |
+| DSR trials | 3 (round 1) / 10 (round 2) |
 | monitoring window / development sample | 52 weeks / first 104 weeks |
 | out-of-time window | from 2022-01-03 |
 
 ## Appendix B — reproduction
 
 `README.md` lists the eight commands that rebuild every table and number in this report from a
-fresh checkout. Workpapers: `notebooks/00_data_quality` … `04_findings`.
+fresh checkout. Workpapers: `notebooks/00_data_quality` … `05_round2`; developer side: `Quant_Model_Research/clam_weekly.ipynb`, `Long_Term_Trading/gbm_weekly.py`.

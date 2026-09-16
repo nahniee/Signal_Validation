@@ -142,4 +142,4 @@ if __name__ == "__main__":
     import sys
     con = db.connect()
     models = sys.argv[1:] or ["momentum", "gbm", "gbm_expected"]
-    run_all(con, models)
+    run_all(con, models, n_trials=config.N_TRIALS_DSR)

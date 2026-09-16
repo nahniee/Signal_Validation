@@ -5,3 +5,4 @@ _NV="$(.venv/bin/python -c 'import nvidia, os; print(nvidia.__path__[0])')"
 export LD_LIBRARY_PATH="$(ls -d "$_NV"/*/lib | tr '\n' ':')${LD_LIBRARY_PATH:-}"
 export CUDA_CACHE_MAXSIZE=4294967296
 export TF_CPP_MIN_LOG_LEVEL=1
+export TF_FORCE_GPU_ALLOW_GROWTH=true
