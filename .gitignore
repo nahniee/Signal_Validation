@@ -13,3 +13,4 @@ models/*.keras
 .ipynb_checkpoints/
 reports/*.html
 data/*.log
+models/*.pkl
