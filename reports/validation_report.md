@@ -18,9 +18,10 @@
 | `gbm` (deployed) | 0 / 3 | AUC 0.502 | gate off 92% of weeks | **Not approved** — implementation defect (F1) |
 | `clam_orig` | — | — | — | **Not approved** — cannot be validated (F3, F4) |
 | `gbm_weekly` (round 2) | 2 / 3 (fails Deflated Sharpe) | AUC 0.507, calibration slope 0.74 | gate destroys return (CAGR 19.3% → −2.6%) | **Not approved** — real but does not beat the momentum benchmark (§12) |
+| `clam_2021` (round 2) | 0 / 3 | AUC 0.502 | gate off 92% of weeks | **Not approved** — original methodology retrained with an honest cut-off shows no skill (§12) |
 | `clam_weekly_*` (round 2) | 0 / 3 | AUC 0.50 | gate off 61–92% of weeks | **Not approved** — two redevelopment variants, no evidence of skill (§12) |
 
-Across two rounds and eight candidate variants, none is approved for production use; the untuned momentum
+Across two rounds and nine candidate variants, none is approved for production use; the untuned momentum
 rule is retained as the benchmark that any future model must beat. The round-2 redevelopment (§12) confirmed
 that the GBM defect was an implementation error (fixed model passes the noise tests) and that the CLAM
 approach does not produce a usable weekly signal even after its data-construction defect is repaired. The most valuable outputs are five findings
@@ -228,8 +229,13 @@ that produced this report, so the monitoring pack is a query, not a re-implement
 
 Following §11, the model owner redeveloped both rejected models for a **weekly** horizon. The validator's
 role in round 2 was unchanged: same backtest engine, same three questions, same out-of-time window, and
-every variant the developer tried is counted as a trial in the Deflated Sharpe Ratio (`N_TRIALS_DSR = 10`:
-3 round-1 candidates + 6 GBM variants + 1 CLAM variant retained after 3 attempts).
+every variant the developer tried is counted as a trial in the Deflated Sharpe Ratio (`N_TRIALS_DSR = 11`:
+3 round-1 candidates + 6 GBM variants + 1 CLAM variant retained after 3 attempts + the `clam_2021` twin).
+
+The `clam_2021` twin — the **original** CLAM training code and 94-ticker universe, unmodified, with the
+training window cut at 2021-12-31 — was also trained and scored in this round (it could not be run on the
+developer's laptop in round 1). It answers a question the redeveloped models cannot: does the deployed
+methodology itself have skill once it is given an honest out-of-time period?
 
 ### 12.1 What the developer changed
 
@@ -239,17 +245,19 @@ every variant the developer tried is counted as a trial in the Deflated Sharpe R
 | `clam_weekly_cs_demeaned` | sequences built per ticker (F3); training cut at 2021-12-31 (F4); horizon 5 days; scalar target = next-5-day log return minus that week's cross-sectional mean; top-500 training universe | validation rank IC 0.014 |
 | `clam_weekly_cs_rank_small` | as above with a within-week percentile-rank target and a smaller network | validation rank IC 0.016 |
 | *(discarded)* | raw-return target (IC −0.008); weekly-bar input (collapsed to a constant) | — |
+| `clam_2021` | original `clam_model.py` unchanged, `training_end_date = 2021-12-31` | training directional accuracy 0.76 / validation 0.64 (see F11) |
 
 ### 12.2 Results
 
-Q1, full sample 2015-01 → 2026-09, active return vs universe (DSR hurdle at N = 10 is SR₀ = 0.86):
+Q1, full sample 2015-01 → 2026-09, active return vs universe (DSR hurdle at N = 11 is SR₀ = 0.81):
 
 | model | active Sharpe [95% CI] | bootstrap | permutation p | DSR | passed |
 |---|---|---|---|---|---|
-| `momentum` (benchmark) | 0.65 [0.18, 1.10] | PASS | 0.004 PASS | 0.24 FAIL | 2 / 3 |
-| **`gbm_weekly`** | 0.49 [CI > 0] | **PASS** | **0.026 PASS** | 0.11 FAIL | **2 / 3** |
-| `gbm_expected` (round 1) | 0.37 | FAIL | 0.080 FAIL | 0.05 FAIL | 0 / 3 |
+| `momentum` (benchmark) | 0.65 [0.18, 1.10] | PASS | 0.004 PASS | 0.29 FAIL | 2 / 3 |
+| **`gbm_weekly`** | 0.49 [CI > 0] | **PASS** | **0.026 PASS** | 0.14 FAIL | **2 / 3** |
+| `gbm_expected` (round 1) | 0.37 | FAIL | 0.080 FAIL | 0.07 FAIL | 0 / 3 |
 | `gbm` (deployed) | −0.50 | FAIL | 0.226 FAIL | 0.00 FAIL | 0 / 3 |
+| `clam_2021` (original code, 2021 cut) | −0.05 [−0.57, 0.44] | FAIL | 0.298 FAIL | 0.00 FAIL | 0 / 3 |
 | `clam_weekly_cs_rank_small` | 0.04 | FAIL | 0.106 FAIL | 0.00 FAIL | 0 / 3 |
 | `clam_weekly_cs_demeaned` | −0.68 | FAIL | 0.704 FAIL | 0.00 FAIL | 0 / 3 |
 
@@ -260,6 +268,7 @@ Out-of-time 2022-01 → 2026-09:
 | `momentum` | 35.5% | 36.3% | 1.02 | −29.7% | 19.2% |
 | `gbm_weekly` | 19.3% | 36.2% | 0.67 | −43.4% | 8.3% |
 | `gbm_expected` | 17.5% | 35.6% | 0.63 | −37.5% | 11.4% |
+| `clam_2021` | 16.6% | 30.9% | 0.65 | −33.1% | 9.7% |
 | `clam_weekly_cs_rank_small` | 10.7% | 22.5% | 0.57 | −24.1% | 9.1% |
 | `clam_weekly_cs_demeaned` | −0.1% | 26.8% | 0.13 | −39.0% | — |
 | universe equal-weight | 11.6% | 19.2% | 0.67 | −21.6% | — |
@@ -277,7 +286,8 @@ that the rule set as specified is not a usable control.
 |---|---|---|---|
 | F8 | `gbm_weekly` | Medium | The fixed model is statistically distinguishable from noise (bootstrap and permutation pass) but its out-of-time Sharpe (0.67) equals the equal-weighted universe and trails the untuned benchmark (1.02) with a deeper drawdown. Reason for rejection moves from *implementation defect* to *no value over benchmark*. |
 | F9 | `clam_weekly_*` | High | After repairing F3/F4 and trying four target/input variants on a 478-ticker, 142k-window training set, the best validation rank IC is 0.016 and out-of-time performance is indistinguishable from the universe. The limitation is the approach — OHLCV sequences alone carry no exploitable weekly cross-sectional signal at this scale — not the implementation. |
-| F10 | process | Low | Multiple-testing accounting: raising the trial count from 3 to 10 lifts the DSR hurdle from SR₀ = 0.51 to 0.86 and fails every candidate including the benchmark. Development iterations must be logged so the validator can count them. |
+| F10 | process | Low | Multiple-testing accounting: raising the trial count from 3 to 11 lifts the DSR hurdle from SR₀ = 0.51 to 0.81 and fails every candidate including the benchmark. Development iterations must be logged so the validator can count them. |
+| F11 | `clam_2021` / `clam_orig` | High | The original training code reports directional accuracy of 0.76 (train) / 0.64 (validation), yet the same model scores AUC 0.49–0.50 in every calendar year and an active Sharpe of −0.05. The in-training metric is an artefact of F3: in a window that mixes 94 tickers on the same dates, the "next row" is largely another stock on the same day, so the network learns same-day market direction, which is useless for the single-stock sequences it receives in production. This is how the defect stayed hidden from the developer. |
 
 ### 12.4 Decision
 
@@ -285,7 +295,7 @@ that the rule set as specified is not a usable control.
 |---|---|---|
 | `momentum` | conditionally approved as benchmark | unchanged |
 | `gbm` → `gbm_weekly` | not approved (F1) | **not approved** — passes noise tests, fails to beat benchmark (F8); may be resubmitted with a documented economic rationale and a smaller trial count |
-| `clam_orig` → `clam_weekly_*` | not approved (F3, F4) | **not approved** — recommend discontinuing the sequence-model approach for weekly selection (F9) |
+| `clam_orig` → `clam_2021` / `clam_weekly_*` | not approved (F3, F4) | **not approved** — the original methodology has no skill once given an honest out-of-time period (F11), and the repaired version has none either (F9); recommend discontinuing the sequence-model approach for weekly selection |
 
 Recommendation to the owner: stop iterating on CLAM; if GBM-weekly is pursued, its only demonstrated
 content is trailing mean return (F2), so it should be compared against — or merged into — the momentum
@@ -305,7 +315,7 @@ benchmark rather than maintained as a separate model.
 | GBM | 504-day lookback, 65-day horizon |
 | CLAM | 252-day input, 65-day horizon; original weights through 2025-08-22; retrain cut 2021-12-31 |
 | bootstrap | stationary, mean block 13 weeks, 5,000 draws |
-| DSR trials | 3 (round 1) / 10 (round 2) |
+| DSR trials | 3 (round 1) / 11 (round 2) |
 | monitoring window / development sample | 52 weeks / first 104 weeks |
 | out-of-time window | from 2022-01-03 |
 

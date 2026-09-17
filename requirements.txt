@@ -8,3 +8,4 @@ tensorflow>=2.16    # CLAM inference / retrain only
 joblib
 matplotlib
 tqdm
+seaborn             # imported by Quant_Model_Research/clam_workflow.py

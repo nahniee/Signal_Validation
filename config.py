@@ -45,7 +45,7 @@ CLAM_RETRAIN_CUTOFF = "2021-12-31"        # retrained twin -> ~4.7y out-of-time
 
 # --- Validation -------------------------------------------------------------
 OOT_START = "2022-01-03"        # out-of-time window for champion/challenger
-N_TRIALS_DSR = 10               # round 1: 3 candidates; round 2 adds 6 GBM-weekly variants + CLAM-weekly
+N_TRIALS_DSR = 11               # round 1: 3 candidates; round 2 adds 6 GBM-weekly variants + CLAM-weekly + clam_2021 twin
 BOOTSTRAP_BLOCK = 13            # weeks (~1 quarter) for stationary block bootstrap
 BOOTSTRAP_N = 5000
 PSI_BUCKETS = 10

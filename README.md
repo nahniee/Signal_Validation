@@ -25,14 +25,14 @@ findings, limitations, monitoring plan and prohibited-use conditions.
 | `gbm` | `Long_Term_Trading/stats_model_process.py` | deployed statistical model — single Monte-Carlo path score, reproduced verbatim |
 | `gbm_expected` | derived here | same model's closed-form expectation, to isolate the Monte-Carlo noise |
 | `clam_orig` | `Quant_Model_Research/quarterly_model.h5` | deployed CNN-LSTM-Attention model, weights as shipped |
-| `clam_2021` | `scripts/retrain_clam.py` | same training code with the window cut at 2021-12-31, to obtain an honest out-of-time period |
+| `clam_2021` | `scripts/retrain_clam.py` | same training code, 94-ticker universe and architecture, window cut at 2021-12-31 — the deployed methodology given an honest out-of-time period |
 | `momentum` | textbook 12-1 momentum | untuned benchmark rule: a complex model that cannot beat it is not approved |
 | `gbm_weekly` | `Long_Term_Trading/gbm_weekly.py` (round 2) | redeveloped GBM: 5-day horizon, closed-form score; best of 6 variants on the development sample |
 | `clam_weekly_*` | `Quant_Model_Research/clam_weekly.py` (round 2) | redeveloped CLAM: per-ticker sequences, training cut 2021-12-31, weekly scalar target; two variants retained |
 
-**Outcome so far:** two validation rounds, eight candidate variants, none approved. Round 2 showed the GBM
+**Outcome so far:** two validation rounds, nine candidate variants, none approved. Round 2 showed the GBM
 defect was an implementation error (the fixed model passes the noise tests but does not beat the benchmark)
-and that the CLAM approach yields no weekly signal even after its data-construction defect is repaired.
+and that the CLAM methodology has no skill either as deployed (retrained with an honest cut-off) or after its data-construction defect is repaired.
 Details in `reports/validation_report.md` §12 and `notebooks/05_round2.ipynb`.
 
 ## Layout
