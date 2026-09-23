@@ -1,4 +1,4 @@
--- Exact common SPY calendar: never substitute a later ticker observation.
+-- All dates come from SPY's trading calendar; a missing quote stays missing.
 -- Signal at week-end close; base execution next session close to next execution close.
 WITH available_prices AS (
  SELECT * FROM prices WHERE date <= $end

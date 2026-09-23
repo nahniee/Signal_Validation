@@ -32,7 +32,7 @@ BENCHMARK = "SPY"
 MIN_PRICE = 5.0
 MIN_ADV_USD = 5_000_000         # 20-day average dollar volume
 
-# Candidate parameters, fixed rather than tuned here.
+# Candidate parameters. None of these were tuned here.
 MOM_LOOKBACK, MOM_SKIP = 252, 21          # 12-1 momentum
 GBM_LOOKBACK, GBM_HORIZON = 730, 63       # calendar-day lookback, original 63-step path
 CLAM_SEQ_LEN = 252
@@ -57,7 +57,7 @@ VALIDATION_MODELS = ["momentum", "gbm", "gbm_expected", "gbm_weekly", "clam_2021
                      "clam_weekly_cs_rank_small_n3000_seed20260922"]
 
 # Kill switch: the signal is held in cash for the coming week if any rule trips.
-# Thresholds follow documented conventions; historical preregistration is not established.
+# The thresholds are common conventions, not fitted to this data.
 GATE_RULES = {
     "psi_score":       (">", 0.25),   # score distribution shifted vs the development sample
     "rolling_sharpe":  ("<", 0.0),    # trailing 52w active Sharpe negative

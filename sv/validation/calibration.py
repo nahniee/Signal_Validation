@@ -1,4 +1,4 @@
-"""Target-matched descriptive calibration, never a cross-horizon skill claim."""
+"""Descriptive calibration of each model against its own target and horizon."""
 import numpy as np
 import pandas as pd
 import config

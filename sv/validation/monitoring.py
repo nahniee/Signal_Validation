@@ -93,14 +93,14 @@ def rolling_metrics(con, model: str) -> pd.DataFrame:
              "psi_input": psi(vol_dev, np.concatenate([vol_by_date.get(d, []) for d in win]), edges=vol_edges)}
         g1 = g.dropna(subset=["score", "ret_fwd_1w"])
         m["auc_1w"], m["ks_1w"] = auc(g1.score.values, g1.y1.values), ks_stat(g1.score.values, g1.y1.values)
-        # Use actual maturity dates, including holidays, rather than a fixed 13-week offset.
+        # Use each target's real maturity date, which accounts for holidays.
         known = df[(df.date < dates[i]) & (df.target_date_13w <= dates[i])]
         mature_dates = sorted(known.date.unique())[-W:]
         g13 = known[known.date.isin(mature_dates)].dropna(subset=["score", "ret_fwd_13w"])
         if len(g13):
             m["auc_13w"], m["ks_13w"] = auc(g13.score.values, g13.y13.values), ks_stat(g13.score.values, g13.y13.values)
             x, y = g13.score.values, g13.ret_fwd_13w.values
-            # Only a diagnostic association: scores here do not predict this exact target.
+            # Descriptive only: these scores forecast a different target.
             # GBM path-average != terminal return; CLAM High != Close; weekly != 65d.
             m["association_slope_13w"] = float(np.polyfit(x, y, 1)[0]) if x.std() > 0 else np.nan
         rows.append({"date": dates[i], **m})

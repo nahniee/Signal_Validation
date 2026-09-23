@@ -1,8 +1,9 @@
-"""Predeclared paired universe-size experiment; never select using OOT outcomes.
-Frozen architecture: historical cs_rank_small. Same seed, purged validation split,
-finite-window policy and callbacks for N=94, N=500 and N=3000, so only training-universe
-size varies. N=94 matches the size of the original hand-picked training list, but selects
-by market-cap rank like the other rungs. Original artifacts unchanged.
+"""Trains the small weekly rank-target CLAM on 94, 500 or 3000 stocks.
+
+Everything except the number of training stocks is fixed: architecture, seed, purged
+validation split, window filtering and callbacks. The 94-stock run matches the size of
+the original hand-picked list but, like the others, picks stocks by market cap. None of
+the runs is selected on out-of-time results, and existing model files are left alone.
 """
 import os
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL','1')
@@ -30,7 +31,7 @@ def split_masks(ends,target_ends,split):
     return target_ends < np.datetime64(split), ends >= np.datetime64(split)
 
 def build(cfg):
-    # Explicitly constrain the DB query before any features or labels are built.
+    # Filter in the query itself, before any features or labels are built.
     import duckdb
     c=duckdb.connect(cfg['db_path'],read_only=True)
     prices=c.execute('''SELECT p.date,p.ticker,p.open,p.high,p.low,p.close,p.adj_close,p.volume
@@ -63,7 +64,7 @@ def build(cfg):
         contributing.append(ticker)
     X=np.concatenate([p[0] for p in parts]); y=np.concatenate([p[1] for p in parts])
     dates=np.concatenate([p[2] for p in parts]); maturity=np.concatenate([p[3] for p in parts]); del parts,feats
-    # Preserve historical per-ticker stride and exact-date rank target for both sizes.
+    # Same per-ticker stride and same-date rank target as the historical model.
     y=(pd.Series(y).groupby(dates).rank(pct=True).values-.5).astype(np.float32)
     train,val=split_masks(dates,maturity,split)
     scale=float(y[train].std())

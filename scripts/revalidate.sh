@@ -1,5 +1,5 @@
 #!/bin/sh
-# Revalidate existing frozen scores. No OOT-driven model reselection or retraining.
+# Reruns the review on the saved scores. Doesn't re-pick or retrain any model.
 set -eu
 .venv/bin/python -m sv.features
 .venv/bin/python scripts/run_candidates.py

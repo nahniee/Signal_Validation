@@ -1,8 +1,9 @@
 """Build the tradable universe: top-N US-listed common equities by market cap.
 
-This is a *current* snapshot (Yahoo screener), so companies that were delisted
-before today are absent -> survivorship bias. Documented in the report; its impact can differ by strategy. Subtracting a shared benchmark does not
-remove it, and listing coverage does not quantify its performance impact.
+The list comes from today's Yahoo screener, so companies delisted before today are
+missing. That survivorship bias can affect each strategy differently. Subtracting a
+shared benchmark doesn't remove it, and counting listings doesn't measure its effect
+on returns.
 """
 import json
 import time
@@ -65,6 +66,6 @@ if __name__ == "__main__":
     db.init_schema(con)
     uni = build(con)
     print(f"universe: {len(uni)} tickers, mcap range "
-          f"${uni.market_cap.min()/1e6:,.0f}M – ${uni.market_cap.max()/1e9:,.0f}B")
+          f"${uni.market_cap.min()/1e6:,.0f}M to ${uni.market_cap.max()/1e9:,.0f}B")
     print(uni.head(10)[["ticker", "name", "market_cap"]])
     print(uni.tail(5)[["ticker", "name", "market_cap"]])

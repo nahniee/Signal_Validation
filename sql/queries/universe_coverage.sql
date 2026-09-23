@@ -1,7 +1,6 @@
--- How many of today's 3,000 tickers actually have prices, and pass the liquidity
--- filter, in each past year. The rising count is the footprint of survivorship
--- bias: companies that were delisted before the snapshot date never appear, and
--- companies listed after year X are absent from year X.
+-- How many of today's 3,000 tickers have prices, and pass the liquidity filter,
+-- in each past year. The count rises over time because companies delisted before
+-- the snapshot date never appear and later listings are missing from earlier years.
 
 SELECT
     EXTRACT(year FROM date)                     AS year,

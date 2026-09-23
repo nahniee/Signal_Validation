@@ -30,7 +30,7 @@ def decide(w: pd.DataFrame, rules: dict = config.GATE_RULES) -> pd.DataFrame:
     for metric, (op, thr) in rules.items():
         if metric in w.columns:
             tripped[metric] = OPS[op](w[metric], thr) & w[metric].notna()
-    # Missing required monitoring evidence is a control failure, not permission to trade.
+    # A missing metric switches the strategy off.
     for metric in rules:
         tripped[f"missing:{metric}"] = w[metric].isna() if metric in w else True
     reason = tripped.apply(lambda r: ",".join(c for c in tripped.columns if r[c]), axis=1)
@@ -41,7 +41,7 @@ def decide(w: pd.DataFrame, rules: dict = config.GATE_RULES) -> pd.DataFrame:
 def challenger_returns(con, model: str, gate: pd.DataFrame, cost_bps: float = config.COST_BPS) -> pd.DataFrame:
     weights = backtest.top_n_weights(backtest._panel(con, model))
     on = gate.set_index("date")["gate_on"]
-    # Recompute actual traded holdings, avoiding hypothetical ungated turnover on re-entry.
+    # Costs come from the positions actually held while the gate is on.
     weights["w"] *= weights.date.map(on).fillna(False).astype(float)
     out = backtest.portfolio_returns(weights, cost_bps=cost_bps)
     out["strategy"] = f"{model}_gated"

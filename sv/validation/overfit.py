@@ -1,8 +1,8 @@
 """Evidence that a candidate's out-of-time record is not explained by chance.
 
-All three tests run on weekly active returns (strategy minus the equal-weighted
-tradable universe), which controls some shared universe exposure but neither removes
-survivorship bias nor measures it.
+All three tests run on weekly active returns: the strategy minus the equal-weighted
+tradable universe. That controls for some of the exposure the strategies share, though
+survivorship bias is still there and unmeasured.
 
 Stationary block bootstrap (Politis & Romano 1994) gives a confidence interval for the
 annualised Sharpe ratio; quarter-length blocks preserve the autocorrelation and
@@ -12,9 +12,9 @@ Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014) is the probability that the
 Sharpe exceeds the best of N noise strategies, adjusted for skew, kurtosis and sample length.
 
 The cross-sectional permutation null resamples holdings within each signal date, keeping
-the dates, universe and top-N mechanics, and compares gross returns: a shuffled signal
-turns the book over almost completely each week, so a net-return comparison would reward
-low turnover rather than selection.
+the dates, universe and top-N mechanics, and compares gross returns. A shuffled signal
+turns the book over almost completely each week, so comparing net returns would mostly
+reward low turnover.
 """
 import numpy as np
 import pandas as pd
@@ -105,7 +105,7 @@ def permutation_null(con, model: str, n_perm: int = 500, seed: int = 0, bench: s
         if not np.isfinite(returns).all():
             raise ValueError("Permutation universe contains missing realised returns")
         k = min(config.HOLD_TOP_N, len(group))
-        # Exchangeability null conditional on this snapshot/universe; not a causal test.
+        # The null assumes names are exchangeable within this snapshot's universe.
         for i in range(n_perm):
             null_returns[i, j] = returns[rng.choice(len(returns), k, replace=False)].mean() - ew.loc[date]
     null = null_returns.mean(axis=1) / null_returns.std(axis=1, ddof=1) * np.sqrt(ANN)

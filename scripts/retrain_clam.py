@@ -1,11 +1,10 @@
-"""Retrain the CLAM 'quarterly' model with the ORIGINAL code path
-(Quant_Model_Research/clam_model.py: same tickers, architecture, hyper-parameters,
-loss, callbacks) but with the training window truncated at CLAM_RETRAIN_CUTOFF.
+"""Retrains the quarterly CLAM with the original code in Quant_Model_Research/clam_model.py
+(same tickers, architecture, hyperparameters, loss and callbacks), stopping the training
+data at CLAM_RETRAIN_CUTOFF so there is a real out-of-time period to test on.
 
-This is not a new model - it is the deployed methodology re-run on an earlier
-information set so that an honest out-of-time window exists. Nothing is tuned. legacy_metric=True deliberately preserves the historical defective
-selection metric for this original-methodology twin; new training defaults to the corrected metric.
-Artifacts land in models/clam_2021_model.h5 / models/clam_2021_scaler.pkl.
+Nothing is tuned. legacy_metric=True keeps the old selection metric so the twin matches
+the original method; new training uses the corrected metric by default. Output goes to
+models/clam_2021_model.h5 and models/clam_2021_scaler.pkl.
 """
 import os, sys, shutil
 from pathlib import Path

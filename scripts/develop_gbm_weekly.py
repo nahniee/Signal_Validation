@@ -1,9 +1,9 @@
-"""Developer-side model selection for GBM weekly v2.
+"""Picks the weekly GBM variant, as the developer would.
 
-Scores all six variants, backtests them, and picks the best *development-sample*
-active Sharpe (dates < config.OOT_START). Out-of-time performance is deliberately
-not printed here - that is the validator's job. The winner is copied to model
-name 'gbm_weekly'; the six variants stay in `signals` as DSR trials.
+Scores and backtests all six variants and keeps the one with the best active Sharpe
+before config.OOT_START. It prints nothing from the out-of-time period, which is left
+for the review. The winner is copied to 'gbm_weekly', and all six stay in `signals`
+so the Deflated Sharpe Ratio can count them.
 """
 import sys
 from pathlib import Path; sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

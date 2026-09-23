@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS monitoring (
     PRIMARY KEY (model, metric, date)
 );
 
--- Kill-switch decisions: was the signal trusted this week, and why not if not.
+-- Kill-switch decisions: whether the signal was used this week, and the reason if not.
 CREATE TABLE IF NOT EXISTS gate_decisions (
     date      DATE NOT NULL,
     model     VARCHAR NOT NULL,

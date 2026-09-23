@@ -1,6 +1,7 @@
-"""Audit frozen clam_2021 on sparse OOT single-stock windows; do not retrain.
-Legacy and inverse-scaled direction use the identical predictions and actual 65-day
-Close targets. This is an OOT diagnostic, not a reconstruction of training accuracy.
+"""Checks the CLAM direction metric on out-of-time single-stock windows, using the
+frozen clam_2021 weights. Both the old and the corrected metric score the same
+predictions against the realised 65-day closes. It tests the metric only and doesn't
+try to reproduce the accuracy reported during training.
 """
 import os
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
@@ -16,7 +17,7 @@ from sv.candidates.clam import load, feature_matrix, windows_for_date
 con = db.connect(read_only=True)
 model, scaler = load('clam_2021')
 X, dates, tickers = feature_matrix(con)
-# Fixed alphabetical subset and 65-session spacing; no performance-based selection.
+# Alphabetical subset, 65 sessions apart, chosen without looking at results.
 wanted = set(sorted(tickers)[:100])
 positions = [i for i,d in enumerate(dates) if pd.Timestamp(config.OOT_START) <= d <= pd.Timestamp(config.EVALUATION_END)]
 legacy = corrected = total = windows = 0

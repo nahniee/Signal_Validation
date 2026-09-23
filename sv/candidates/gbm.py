@@ -1,14 +1,14 @@
 """GBM path-simulation score, reproduced with documented data conventions from
 Long_Term_Trading/stats_model_process.get_gbm_path_simulation (mode='quarterly').
 
-As deployed: fit mu, sigma on ~2y of daily log returns, simulate ONE 63-step GBM
-path, score = mean(path)/S0 - 1. The single Monte-Carlo draw is reproduced with a
-fixed seed per full scoring run so the backtest is deterministic.
+The deployed version fits mu and sigma on about two years of daily log returns,
+simulates a single 63-step GBM path and scores mean(path)/S0 - 1. A fixed seed per
+scoring run keeps the backtest repeatable.
 
-Validation note (see report): E[score] = mean_i exp(mu * t_i) - 1 depends on mu
-only, so the ranking is in expectation a monotone transform of trailing mean log
-return; the MC draw adds pure noise of order sigma*sqrt(T). We also emit the
-deterministic expectation as model 'gbm_expected' to quantify that noise.
+E[score] = mean_i exp(mu * t_i) - 1 depends only on mu, so on average the ranking is just
+a monotone transform of trailing mean log return, and the one random path adds noise of
+order sigma*sqrt(T). The expected score is also written as 'gbm_expected' so that noise
+can be measured.
 """
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ T, N, SCALE = 0.25, config.GBM_HORIZON, 252
 
 def _mu_sigma(adj_close: pd.DataFrame, dates: list[str]):
     lr = np.log(adj_close).diff()
-    # Two calendar years, as in the source. Current close is included deliberately.
+    # Two calendar years up to and including the signal-day close, as in the source.
     window = f"{config.GBM_LOOKBACK}D"
     mu = lr.rolling(window, min_periods=454).mean() * SCALE
     sig = lr.rolling(window, min_periods=454).std() * np.sqrt(SCALE)

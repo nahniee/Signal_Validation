@@ -1,5 +1,5 @@
-"""Execute these plain-Python workpapers in-process, retaining Jupyter outputs.
-No network/kernel service is required. Stop immediately on any cell error.
+"""Runs the notebooks in this process and saves their outputs, with no Jupyter kernel
+or network needed. Stops at the first cell that raises an error.
 """
 import ast, contextlib, io, os
 from pathlib import Path

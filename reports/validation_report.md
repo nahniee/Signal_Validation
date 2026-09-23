@@ -1,56 +1,56 @@
-# Model validation review - GBM and CLAM
+# Model validation review: GBM and CLAM
 
-**Revised:** 2026-09-22. **Role:** self-validation project adopting a second-line review structure; developer and reviewer are the same person. This is not organizationally independent validation or a regulatory approval.
+Revised 2026-09-22. I built these models and reviewed them myself, using the structure a bank's second-line model validation team would follow. That makes this a self-review. It is not independent and has no regulatory standing.
 
-## 1. Executive decision
+## 1. Decision
 
-**No candidate is approved for production.** Momentum is retained as a comparison rule, not an approved trading model. These are project decisions under the evidence and limitations below, not proof that the model families have no predictive value.
+**No candidate is approved for production.** Momentum stays in the review as a yardstick for the others.
 
-The story has two distinct stages: review the original quarterly forecasters and their proposed weekly use; then assess separately versioned weekly redevelopments. Repairing an implementation defect and changing the prediction horizon are different interventions. This project does **not** establish that a properly implemented quarterly strategy cannot work.
+The review ran in two stages. First I went through the original quarterly models and how they would be used in a weekly strategy. Then I rebuilt both models for a weekly horizon and reviewed the new versions on their own. Fixing a coding defect and changing the forecast horizon are different kinds of change, so the weekly results say nothing about whether a correctly built quarterly model would work.
 
-The revised OOT table below supersedes earlier report numbers. In particular, whole-sample significance, shortened lagged holding periods and the old CLAM direction metric must not be used as approval evidence. The evaluation ends on **2026-08-28**. Q1 uses 241 complete weekly holding periods after 2022-01-03, with entry and exit prices both observed by that cutoff. This is after the recorded training/selection cutoff, but the period has already been inspected in earlier rounds and is not an untouched holdout.
+The figures here replace the ones in earlier drafts. Those drafts ran the tests over the whole sample, used a shortened holding period in the lag check and scored CLAM with a faulty direction metric, so none of their numbers should be used. Testing now covers 2022-01-03 to 2026-08-28: 241 complete weekly holding periods, all after the training and selection cutoff. I had already looked at this period in earlier rounds, which makes it out-of-time but not a clean holdout.
 
-## 2. Review trail and scope
+## 2. How the review ran
 
 ![Review process](figures/fig5_review_process.png)
 
-| stage | purpose | evidence / consequence |
+| stage | what it covered | outcome |
 | --- | --- | --- |
-| Original quarterly implementation | Examine original code, input construction, score meaning and provenance | GBM single-path noise; CLAM cross-ticker windows; incorrect direction metric; original-weight training cutoff unverified |
-| Original-methodology twin | Freeze training at 2021-12-31 to examine later observations | `clam_2021`; retains original sequence and historical metric defects deliberately |
-| Weekly redevelopment | Change intended prediction target/horizon and repair input construction | Separate `gbm_weekly` / `clam_weekly_*` model versions, not a successful quarterly validation |
-| Revalidation | Apply shared execution, OOT tests, monitoring and controls | Results below; no production approval |
-| Next approval review | Freeze specifications and seek new evidence | Untouched future data, historical universe data, complete experiments and operational execution evidence |
+| Original quarterly code | The code, how inputs are built, what the score means, where the weights came from | GBM ranks stocks on one random path; CLAM mixes tickers inside training windows; the CLAM direction metric was wrong; the original weights' training cutoff can't be verified |
+| 2021 twin | The original CLAM method retrained on data up to 2021-12-31 | `clam_2021`, which keeps the original defects so it stays true to the original method |
+| Weekly redevelopment | A weekly target and horizon, and per-ticker input windows | `gbm_weekly` and `clam_weekly_*`, reviewed as new models |
+| Revalidation | The same execution rules, out-of-time tests, monitoring and gate for every candidate | Sections 5 to 7; nothing approved |
+| Next review | A frozen specification and new evidence | Data collected after the freeze, a point-in-time universe, a full experiment log, real execution data |
 
-The portfolio application here is weekly top-50 equal-weight long-only selection. It is not a native quarterly-holding backtest. Original-horizon target-matched diagnostics are reported separately in section 7. Risk limits, capacity and live execution are not validated.
+The strategy under test holds the 50 highest-scored stocks each week, long only and equally weighted. It isn't a quarterly buy-and-hold backtest; section 7 checks the quarterly forecasts against quarterly targets separately. Risk limits, capacity and live trading were out of scope.
 
-## 3. Model identity and reproduction differences
+## 3. Candidates and how closely they match the originals
 
-| candidate | identity | fidelity / limitation |
+| candidate | what it is | notes |
 | --- | --- | --- |
-| `gbm` | Original 63-step, T=0.25, single-path mean-price score | Two-calendar-year rolling window, at least 454 returns; adjusted panel close; includes current signal close; deterministic full-run seed. Controlled reproduction, not verbatim replay of live downloads/RNG |
-| `gbm_expected` | Closed-form mean-path expectation of that implemented formula | Monotone in the fitted mean log return; analytical diagnostic, not a separately trained model |
-| `clam_orig` | Historical quarterly weights | Original h5/scaler absent in this checkout; cutoff unverified. File mtime cannot establish training membership |
-| `clam_2021` | Saved original-methodology twin, cutoff 2021-12-31 | Existing weights unchanged; original sequence and metric defects retained for historical comparison |
-| `gbm_weekly` | Frozen alias `gbm_w_126_expected`, selected in the earlier development exercise | Six lookback/score variants logged. Alias was not reselected after this review changed execution |
-| `clam_weekly_*` | Saved per-ticker weekly scalar-target redevelopments | Historical weights unchanged; the universe-size pair is separately trained. Demeaned-return and rank scores are not raw predicted returns |
-| `momentum` | Fixed 12-1 ranking rule | Comparator under the same snapshot/execution assumptions; no production approval |
+| `gbm` | The original score: the mean of one simulated 63-step price path (T = 0.25) | Two calendar years of history (at least 454 returns), adjusted closes up to and including the signal day, one fixed seed per run. Same formula as the original, though it can't replay the original's live downloads or random draws |
+| `gbm_expected` | The expected value of that score, in closed form | Ranks stocks exactly as their mean log return does. Used as a diagnostic |
+| `clam_orig` | The original quarterly weights | The .h5 and scaler files aren't in this checkout and their training cutoff is unknown. A file timestamp can't show which dates were used in training |
+| `clam_2021` | The original CLAM method, retrained to 2021-12-31 | Weights unchanged since training. It keeps the original window and metric defects on purpose |
+| `gbm_weekly` | `gbm_w_126_expected`, picked in the earlier development round | All six lookback and score variants are logged. I didn't re-pick it after changing the execution rules |
+| `clam_weekly_*` | Weekly CLAM with per-ticker windows and a single-number target | The universe-size runs were trained separately. Demeaned and rank scores aren't return forecasts |
+| `momentum` | The standard 12-1 momentum rule | Same data and execution rules as the others |
 
-A 63-step original GBM must not be described as 65 steps. GBM and CLAM quarterly outputs also have different meanings: mean simulated path versus terminal cumulative High log changes. The GBM formula uses the source's mean-log-return drift convention; reproducing that formula is not validation of its economic assumptions. Original forecast error and portfolio selection performance answer different questions.
+The original GBM uses 63 steps; earlier drafts said 65 by mistake. The two quarterly models also score different things: GBM averages a simulated price path, and CLAM adds up predicted daily log changes in the High price. Reproducing the GBM formula checks the code, but the model's economic assumptions still need their own justification. How accurate a forecast is and how well it picks stocks are separate questions.
 
-## 4. Data and executable backtest contract
+## 4. Data and backtest rules
 
-The price observation window is **2013-01-02 through 2026-08-28**. Later prices retained in the raw archive are excluded from this evaluation. The existing universe snapshot is as of 2026-09-15, so its later membership remains a disclosed source of bias. Re-running a live screener/download is a new dataset, not exact reproduction. The universe contains survivors and was selected using later market capitalizations. Subtracting an equal-weight comparator does **not** cancel this bias; strategy-specific effects remain unknown. Listing coverage describes the sample and does not measure the size of return bias.
+Prices run from 2013-01-02 to 2026-08-28. Anything later in the raw files is ignored. The stock list is a snapshot of the 3,000 largest US companies on 2026-09-15, so it only holds firms that survived to that date and were picked using later market caps. Comparing against an equal-weighted portfolio of the same stocks doesn't remove that bias, and I can't tell how much it helps or hurts each strategy. Downloading the data again would give a different dataset.
 
-Signals use week-end close information. Orders are assumed filled at the **next session close**, and held until the following rebalance's next-session close. A common SPY trading calendar determines all dates. Missing ticker quotes are not replaced by the next available future quote. Same-close trades are retained only as optimistic diagnostics (`*_same_close`), with no claim they were executable.
+Each signal uses the week's last close. The trade fills at the next session's close and is held until the next session's close after the following signal. All dates come from SPY's trading calendar, and a missing quote is never filled with a later price. Same-close results (`*_same_close`) are kept as an optimistic comparison only.
 
-**2026-08-28 is the final observation date.** No later price is used for signals, portfolio returns, calibration or the CLAM metric audit. Weekly holding periods and forecast targets that are not complete by the cutoff are excluded. Missing held-name returns within completed periods raise an error. The same fixed cutoff applies to every candidate.
+No price after 2026-08-28 is used anywhere, including signals, returns, calibration and the CLAM audit. Holding periods and targets that end after that date are dropped, and a missing return for a held stock stops the run with an error. Every candidate has the same cutoff.
 
-Tradability at signal time: price >= $5, trailing 20-session average dollar volume >= $5M. Top 50 available scores are equally weighted. Costs are 10 bps per unit of absolute traded weight, including drift in previous holdings; the universe comparator also pays rebalancing costs. This remains a simplified close-fill assumption without capacity/market-impact evidence. Cash earns zero. Sharpe uses zero cash return; active SR is strategy minus equal-weight comparator.
+A stock is tradable on a signal date if it closes at $5 or more and has traded at least $5M a day on average over the last 20 sessions. The top 50 tradable scores get equal weight. Trading costs 10 bps of the absolute weight traded, including drift in existing positions, and the equal-weight benchmark pays the same costs. Filling at the close with no market impact is a simplification. Cash earns nothing, and active Sharpe uses the strategy's return minus the equal-weight benchmark.
 
-## 5. Q1 - evidence after training/selection
+## 5. Q1: is the out-of-time record better than chance?
 
-Stationary bootstrap uses 5,000 draws and mean block 13 weeks; positive 95% CI is the bootstrap screen. The 500-draw permutation comparison uses gross active returns and p=(1+exceedances)/(501). It tests exchangeability of names within each scored cross-section, conditional on this biased snapshot; it does not preserve all sector, exposure or serial score structure. Neither test alone is proof of deployable skill.
+The stationary bootstrap uses 5,000 draws with a mean block of 13 weeks, and a model passes if the 95% interval sits above zero. The permutation test reshuffles which stocks are held within each week's scored set 500 times, compares gross active returns, and reports p = (1 + exceedances) / 501. It is conditional on this snapshot and doesn't keep sector or exposure structure. Passing either test on its own wouldn't show that the model can make money in practice.
 
 | model | active SR [95% CI] | bootstrap | permutation p | permutation | DSR (provisional) |
 | --- | --- | --- | --- | --- | --- |
@@ -65,9 +65,9 @@ Stationary bootstrap uses 5,000 draws and mean block 13 weeks; positive 95% CI i
 | clam_weekly_cs_rank_small_n500_seed20260922 | -0.04 [-0.80, 0.75] | FAIL | 0.267 | FAIL | 0.011 |
 | clam_weekly_cs_rank_small_n3000_seed20260922 | -0.99 [-1.65, -0.35] | FAIL | 0.902 | FAIL | 0.000 |
 
-DSR is **provisional**, not PASS/FAIL approval evidence. `experiments.json` records a minimum of 17 trials: historical baseline/development runs plus the two predeclared training-universe experiments. The `gbm_weekly` alias is not counted twice. 15 trial return series are available: raw-target and collapsed weekly-bar CLAM runs lack recoverable scores. The variance estimate uses the 15 available trial Sharpes on the same OOT window and N=17; unknown prior searches and correlation between trials remain limitations. The historical search count must never be reduced to obtain approval.
+The Deflated Sharpe Ratio is reported but doesn't decide anything yet. `experiments.json` lists at least 17 trials, including the three training-universe runs, and counts the `gbm_weekly` alias once. 15 of them have returns; the raw-target and weekly-bar CLAM runs left no usable scores. The DSR takes its variance from those 15 Sharpe ratios and uses N = 17. Searches I didn't log and correlation between trials would both raise the hurdle, so the trial count can only go up from here.
 
-## 6. OOT portfolio outcomes and controls
+## 6. Out-of-time portfolio results and the gate
 
 | model | weeks | CAGR | vol | Sharpe | max DD | active SR |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -86,7 +86,7 @@ DSR is **provisional**, not PASS/FAIL approval evidence. `experiments.json` reco
 
 ![Revised OOT performance](figures/fig4_round2_oot.png)
 
-Point estimates describe the tested implementations and this snapshot. Failure to reject a null does not establish absence of skill. The four CLAM specifications do not establish that OHLCV or sequence models in general cannot work. Benchmark-relative approval requires fresh evidence of incremental value, not only a favorable absolute CAGR.
+These figures describe the tested versions on this dataset. Failing the tests doesn't prove a model has no skill, and four CLAM variants can't settle whether price-based sequence models work in general. For approval, a model would have to add value over the benchmark on new data, and a high CAGR alone doesn't show that.
 
 | model | CAGR ungated / gated | max DD ungated / gated | Sharpe ungated / gated | off |
 | --- | --- | --- | --- | --- |
@@ -103,11 +103,11 @@ Point estimates describe the tested implementations and this snapshot. Failure t
 
 ![Gate comparison](figures/fig3_champion_challenger.png)
 
-The gate uses PSI >0.25, trailing active SR <0, AUC <0.50 or relative drawdown <-15%. Missing required metrics switch the strategy off. Portfolio metrics are delayed two signal weeks because the preceding delayed-execution holding period has not ended at the current signal close. Entry/exit/rebalance costs are recomputed from actual gated holdings, not added to hypothetical ungated turnover. Relative drawdown uses the ratio of strategy and benchmark wealth.
+The gate moves a strategy to cash for the week if score PSI is above 0.25, trailing active Sharpe is below zero, AUC is below 0.50, or relative drawdown is worse than -15%. It also switches off if any of those metrics is missing. Portfolio metrics lag two signal weeks, since with next-day execution the previous holding period hasn't finished by the current signal. Costs come from the positions the gated strategy actually holds, and relative drawdown compares strategy wealth with benchmark wealth.
 
-Thresholds are documented conventions, not empirically established universal cutoffs. The historical record does not establish prospective preregistration. Reuse of the OOT period and any further changes to thresholds require fresh evaluation. The gate remains an experimental control, not the sole approved risk control.
+The thresholds are common conventions and weren't fitted to this data, and I can't show they were set before I looked at the out-of-time period. Changing them would need a fresh evaluation. The gate is an experiment and shouldn't be the only risk control.
 
-## 7. Monitoring, targets and CLAM metric audit
+## 7. Monitoring, targets and the CLAM metric audit
 
 | model | psi_score | psi_input | auc_1w | rolling_sharpe | active_drawdown |
 | --- | --- | --- | --- | --- | --- |
@@ -124,9 +124,9 @@ Thresholds are documented conventions, not empirically established universal cut
 
 ![Monitoring](figures/fig2_monitoring.png)
 
-PSI bins include infinite tails, so drifted observations are counted. The reference is the first 104 signal weeks; PSI is not reported before that reference exists. Next-execution-period AUC uses only completed targets; 65-session diagnostics use actual target maturity dates. AUC is pooled across stocks/dates and is not a top-50 portfolio skill test.
+PSI buckets are open at both tails so drifted scores still get counted. The reference period is the first 104 signal weeks, and PSI starts after it. Weekly AUC uses only finished targets, and the 65-session diagnostics use each target's actual maturity date. AUC here is pooled across all stocks and dates, which isn't the same as how well the top 50 do.
 
-Calibration below pairs each available raw-return score with its own target and horizon, uses OOT observations matured by 2026-08-28, and reports descriptive pooled coefficients without significance claims. In particular a weekly score's slope against a 13-week return is only an association, never evidence of calibration.
+The calibration table pairs each raw-return score with its own target and horizon, using out-of-time observations that matured by 2026-08-28. The coefficients are descriptive and come without significance tests. Regressing a weekly score on a 13-week return only shows association.
 
 | model | horizon_sessions | n | slope | intercept | mae |
 | --- | --- | --- | --- | --- | --- |
@@ -135,15 +135,15 @@ Calibration below pairs each available raw-return score with its own target and 
 | gbm_weekly | 5 | 518297 | -0.041 | 0.003 | 0.044 |
 | clam_2021 | 65 | 477325 | 0.002 | 0.032 | 0.368 |
 
-GBM targets the mean of adjusted prices from t through t+63 relative to t; weekly GBM targets adjusted Close[t+5]/Close[t]-1; original CLAM targets raw High[t+65]/High[t]-1. Rank/de-meaned weekly CLAM targets lack the exact training cross-section mapping required for comparable return calibration, so no calibration claim is made for them. Overlapping outcomes and stock dependence limit interpretation.
+The targets are: for GBM, the average adjusted price from t to t+63 relative to t; for weekly GBM, adjusted Close[t+5] / Close[t] - 1; for the original CLAM, raw High[t+65] / High[t] - 1. The rank and demeaned weekly CLAM scores can't be mapped back to returns without the exact training cross-section, so they aren't calibrated. Overlapping targets and correlation between stocks make all of these hard to read.
 
-The frozen 2021 twin was evaluated on 1478 single-stock OOT windows (96070 daily Close targets). On the SAME predictions, legacy scaled-sign accuracy was 59.08% and inverse-scaled return-direction accuracy was 49.79%.
+The 2021 twin was scored on 1478 single-stock out-of-time windows (96070 daily close targets). On the same predictions, the old scaled-sign accuracy was 59.08% and the corrected return-direction accuracy was 49.79%.
 
-This fixed alphabetical sample is a diagnostic of the metric, not a reconstruction of the historical 76%/64% training/validation result. MinMax scaling to (-1,1) does not generally map a zero return to zero; the corrected metric compares scaled values against the scaler's image of zero. New original-model training defaults to this corrected metric and early-stopping monitor. Existing weights were not retrained. The historical twin script explicitly requests the legacy metric for fidelity. Cross-ticker sequences remain a separate confirmed defect; the claim that the network specifically learned same-day market direction is withdrawn.
+That fixed alphabetical sample tests the metric itself. It doesn't reproduce the 76% and 64% training and validation figures from the original run. MinMax scaling to (-1, 1) doesn't send a zero return to zero, so the corrected metric compares scaled values against the scaled value of zero. New training of the original model uses the corrected metric for early stopping. The existing weights weren't retrained, and the 2021 twin script asks for the old metric on purpose so it matches the original. The cross-ticker windows are a separate, confirmed defect. An earlier draft said the network had learned same-day market direction; I've dropped that claim.
 
-### 7.1 Training-universe size: matched 94 / 500 / 3000 experiment
+### 7.1 Training-universe size: 94, 500 and 3000 stocks
 
-The historical 94-name training list reflected compute constraints, so this experiment varies only training-universe size on the frozen small weekly rank-target architecture. All three runs share seed 20260922, callbacks and a purged validation boundary, and select tickers by market-cap rank; none was selected using OOT outcomes. Training targets end before 2019-12-31, model-selection targets by 2021-12-31. Requested size differs from usable tickers because later listings lack training history. A smaller universe also means a smaller ranking peer group, so validation rank IC is not comparable across rungs on equal terms.
+The original CLAM was trained on 94 hand-picked stocks, mostly because training took a long time. To check whether that held it back, I trained the small weekly rank-target model three times and changed only the number of stocks used in training: 94, 500 and 3000, picked by market cap. All three runs use seed 20260922, the same callbacks and the same purged validation split, and none of them was chosen by looking at out-of-time results. Training targets end before 2019-12-31 and selection targets by 2021-12-31. Fewer stocks are usable than requested because newer listings have no training history. A smaller universe is also an easier ranking problem, so validation IC can't be compared directly across the three.
 
 | requested_tickers | usable_tickers | training_windows | epochs | validation_rank_ic | oot_cagr | oot_active_sharpe | bootstrap | permutation_p |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -153,38 +153,38 @@ The historical 94-name training list reflected compute constraints, so this expe
 
 ![Training-universe comparison](figures/fig6_training_universe.png)
 
-Paired annualized mean net-return differences against the matched 500-name control: 94 2.48% [-14.56%, 21.78%]; 3000 -12.46% [-23.06%, -1.20%]. These are mean-return differences, not CAGR differences. Single-seed evidence on a reused historical period cannot establish a general size effect. The original 500-name artifact is a historical comparator; the newly trained 500-name run is the matched control. A smaller training universe also changes the rank-target peer group, so size and task difficulty are not separated here. Existing production non-approval remains: fresh holdout, universe-bias and operational evidence are still required.
+Mean annual net-return difference against the new 500-stock run, with 95% bootstrap intervals: 94 stocks 2.48% [-14.56%, 21.78%]; 3000 stocks -12.46% [-23.06%, -1.20%]. These are differences in mean return, which isn't the same as a CAGR difference. The 94-stock and 500-stock runs can't be told apart on this sample. The 3000-stock run is worse than the 500-stock run on this sample. So there's no sign that the original 94-stock list was what held CLAM back. This is one seed on a period I had already studied, and changing the universe also changes the peer group each stock is ranked against, so it doesn't settle how training-set size matters in general. The older 500-stock model is shown for reference; the new 500-stock run is the like-for-like comparison.
 
-## 8. Findings, remediation and closure evidence
+## 8. Findings
 
-| ID | finding / cause | remediation / evidence | status |
+| ID | finding | what was done | status |
 | --- | --- | --- | --- |
-| F1 | Single MC path adds ranking noise | Analytical expectation comparator; revised OOT tables | Original implementation not approved; correction does not prove alpha |
-| F2 | Expected GBM rank is monotone in mean log return | Explicit model identity and benchmark comparison | Documented; economic rationale still required |
-| F3 | Original CLAM mixes tickers within windows | Source review; weekly redevelopment uses per-ticker sequences | Original defect open; repaired structure is a separate model |
-| F4 | Original weights' training provenance unverified | mtime inference removed; original artifacts absent; twin cutoff separately recorded | Blocking for original-weight outcome validation |
-| F5 | Same-close execution and shortened lag sensitivity | Next-close to next-close contract, drift-aware costs, calendar regression tests | Revised implementation; live execution evidence outstanding |
-| F6 | Nonpositive/missing prices | Positive input filters; no zero-filling held-name returns; common sample end | Source data limitations remain |
-| F7 | Validator's cost-biased permutation comparison | Gross-return comparison, finite-sample p correction | Corrected; conditional-null limitations disclosed |
-| F8 | Full-sample tests included development observations | OOT-only Q1 in code and regenerated report | Corrected; reused OOT is not pristine |
-| F9 | Limited CLAM experiments generalized to a whole approach | Conclusions limited to tested specifications/data/period | Overstatement withdrawn |
-| F10 | Incomplete multiple-testing accounting | Minimum 17-trial registry, 15 available returns, provisional DSR | Open until search history/evidence complete |
-| F11 | Direction metric used signs after scaling | Zero-threshold correction, same-prediction audit, corrected new-training monitor | Metric fixed; legacy weights/early selection unchanged |
-| F12 | Cross-horizon calibration interpretation | Target-matched diagnostics; ranks excluded; association relabeled | Corrected; no calibration-based approval |
-| F13 | Independent-review / exact-reproduction overclaims | Self-review role, model differences and artifact hashes recorded | Disclosure corrected |
+| F1 | Scoring on one simulated path adds noise to the ranking | Added the closed-form expectation for comparison and revised the tables | Original not approved. The fix on its own doesn't show an edge |
+| F2 | The expected GBM score ranks stocks the same way as mean log return | Stated in the model description and compared with momentum | Needs an economic reason to be a separate model |
+| F3 | The original CLAM training windows mix tickers | Found in code review; the weekly version uses per-ticker windows | Open in the original. The fixed version is a different model |
+| F4 | No way to verify what data the original weights were trained on | Dropped the timestamp-based cutoff; the files aren't here; the twin's cutoff is recorded | Blocks any verdict on the original weights |
+| F5 | Same-close fills, and the lag check used a shorter holding period | Next-close to next-close execution, drift-aware costs, calendar tests | Fixed in the backtest; no live execution data yet |
+| F6 | Zero, negative and missing prices | Input filters; held-stock returns never filled with zero; one common end date | Problems in the source data remain |
+| F7 | My permutation test was biased by trading costs | Now compares gross returns, with a finite-sample p-value | Fixed; the test's conditional null is noted |
+| F8 | Earlier tests included development-period data | Q1 now runs on out-of-time data only | Fixed, though that period has been looked at before |
+| F9 | Earlier drafts generalised from a few CLAM runs to the whole approach | Conclusions now cover only what was tested | Claim withdrawn |
+| F10 | Not every experiment was counted for multiple testing | A log of at least 17 trials, 15 with returns; DSR marked provisional | Open until the search history is complete |
+| F11 | The direction metric took signs after scaling | Corrected the threshold, re-scored the same predictions, fixed the training monitor | Metric fixed; old weights and early-stopping choices unchanged |
+| F12 | Calibration compared forecasts and targets over different horizons | Matched targets, left rank scores out, renamed the cross-horizon slope | Fixed; nothing approved on calibration |
+| F13 | Earlier drafts overstated independence and how exact the reproductions were | Stated the self-review role, listed the differences, recorded file hashes | Wording fixed |
 
-## 9. Decisions and resubmission conditions
+## 9. Decision and what a resubmission needs
 
-All GBM/CLAM production uses remain unapproved in this project. `clam_orig` additionally lacks original artifact/cutoff evidence. Momentum remains only a comparator. No quarterly model family is rejected in general, and no recommendation to abandon all sequence models is supported.
+None of the GBM or CLAM versions is approved for production. `clam_orig` also lacks the files and training cutoff it would need to be reviewed at all. Momentum is only a comparison. None of this rules out quarterly models in general, or sequence models as a family.
 
-Resubmission requires: frozen intended use and horizon; verified training/data/model provenance; complete experiment registry; point-in-time universe or explicitly bounded bias evidence; realistic execution/cost/capacity validation; matched-target diagnostics; and new untouched observations after specification freeze. Trial counts carry forward. A quarterly-only study would be a different scope requiring quarterly prediction targets and portfolio holding rules, not a rewrite of these weekly-use results.
+A resubmission would need a fixed use and horizon, a documented history of the training data and model, a complete experiment log, a point-in-time stock universe or a bounded estimate of the survivorship bias, realistic execution, cost and capacity tests, matched-target diagnostics, and new data collected after the specification is frozen. Trials already run keep counting. A quarterly-only study would be its own project, with quarterly targets and quarterly holding rules.
 
-Weekly monitoring reviews PSI, discrimination, relative drawdown and active SR; a breach or missing evidence suspends the experimental strategy and triggers investigation. Revalidation is required after material model/data/execution changes. No monitored model is currently authorized for production by this report.
+Ongoing monitoring would check PSI, AUC, relative drawdown and active Sharpe every week. A breach or a missing metric pauses the strategy until someone investigates. Any material change to the model, the data or the execution means revalidating. This report doesn't clear any model for production.
 
-## 10. Reproduction and evidence
+## 10. Reproducing the results
 
-Run `sh scripts/revalidate.sh` against the existing frozen DB and saved scores. It rebuilds the panel, controlled GBM reproduction, portfolio returns, OOT tests, monitoring, gates, report and figures without reselecting weekly models. Run `scripts/audit_clam_metric.py` with TensorFlow separately to rebuild the metric audit. `tests/test_validation_contracts.py` covers timing, missing data, drift, PSI tails, OOT filtering and metric threshold semantics.
+`sh scripts/revalidate.sh` rebuilds everything from the saved database and scores: the panel, the GBM reproduction, portfolio returns, the out-of-time tests, monitoring, the gate, this report and its figures. It doesn't re-pick the weekly models. `scripts/audit_clam_metric.py` rebuilds the metric audit and needs TensorFlow. `tests/test_validation_contracts.py` covers timing, missing data, drift, PSI tails, out-of-time filtering and the metric threshold.
 
-The updated notebook workpapers query this same database. CSVs beside this report expose the tables; `review_manifest.json` records code/artifact hashes and the evaluation contract. The PDF is generated from this report. No fresh price download or production deployment was performed. Historical CLAM weights are preserved; the separately registered 500/3000-ticker runs are new trained artifacts.
+The notebooks read the same database, and the CSVs next to this report hold its tables. `review_manifest.json` records file hashes and the evaluation settings, and the PDF is generated from this Markdown. No new prices were downloaded and nothing was deployed. The historical CLAM weights haven't changed; the 94, 500 and 3000-stock runs are new models trained for section 7.1.
 
-The review structure is inspired by conceptual-soundness review, ongoing monitoring and outcome analysis in the historical [SR 11-7 guidance](https://www.federalreserve.gov/supervisionreg/srletters/sr1107a1.pdf). This is a methodological reference, not a claim of current regulatory compliance.
+The structure follows the conceptual-soundness, monitoring and outcome-analysis parts of the Federal Reserve's [SR 11-7 guidance](https://www.federalreserve.gov/supervisionreg/srletters/sr1107a1.pdf). I used it as a template; the report makes no claim of regulatory compliance.
