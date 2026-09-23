@@ -1,10 +1,8 @@
-"""Candidate 2b: CLAM weekly v2 (Quant_Model_Research/clam_weekly.py), scored on
-every rebalance date over the tradable universe. One model per training target
-('raw' / 'cs_demeaned') -> signals model name clam_weekly_<target>. Preprocessing is imported from
-the training module so train and inference cannot drift apart (finding F3).
+"""Scores a redeveloped weekly CLAM model over the tradable universe.
 
-score = predicted next-5-day log return (in units of the training target's std).
-Written to `signals` date-by-date, resumable.
+One trained variant per signals model name clam_weekly_<variant>. Preprocessing is
+imported from the training module so training and inference cannot drift apart, which
+was the defect recorded as F3. Scores are written date by date, so a run is resumable.
 """
 import sys
 import numpy as np

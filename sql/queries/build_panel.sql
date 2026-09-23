@@ -1,59 +1,33 @@
--- Build the weekly rebalance panel from daily prices.
--- Parameters: $min_price, $min_adv, $start
---
--- Reading guide (each CTE feeds the next):
---   daily     : per ticker, per day -> liquidity stats + prices shifted forward with LEAD()
---   week_end  : the one calendar shared by every ticker: SPY's last trading day of each week
---   weekly    : keep only rebalance days
---   weekly_lead: price at the *next* rebalance date, to compute the 1-week forward return
---
--- Window functions in one line: "OVER (PARTITION BY ticker ORDER BY date ...)" means
--- "compute this per ticker, in date order, looking at a sliding range of rows".
-
-WITH daily AS (
-    SELECT
-        ticker, date, close, adj_close, volume,
-        -- trailing 20-day average dollar volume (this row + 19 before it)
-        AVG(close * volume) OVER (
-            PARTITION BY ticker ORDER BY date
-            ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)                       AS adv20_usd,
-        -- how many rows the 20-day window actually contains (< 20 near a listing date)
-        COUNT(*) OVER (
-            PARTITION BY ticker ORDER BY date
-            ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)                       AS n20,
-        -- LEAD(x, k) = value of x k rows later, within the same ticker
-        LEAD(adj_close, 1)  OVER (PARTITION BY ticker ORDER BY date)         AS adj_close_t1,
-        LEAD(adj_close, 65) OVER (PARTITION BY ticker ORDER BY date)         AS adj_close_t65
-    FROM prices
-    -- Yahoo occasionally returns zero or negative adjusted prices; treat them as missing
-    WHERE close > 0 AND adj_close > 0
-),
-week_end AS (
-    -- date_trunc('week', d) = the Monday of d's week, so grouping by it groups by ISO week
-    SELECT MAX(date) AS date
-    FROM prices
-    WHERE ticker = 'SPY'
-    GROUP BY date_trunc('week', date)
-),
-weekly AS (
-    SELECT d.*
-    FROM daily d
-    JOIN week_end w USING (date)
-    WHERE d.date >= $start
-),
-weekly_lead AS (
-    SELECT
-        *,
-        LEAD(adj_close, 1) OVER (PARTITION BY ticker ORDER BY date)           AS adj_close_nw
-    FROM weekly
+-- Exact common SPY calendar: never substitute a later ticker observation.
+-- Signal at week-end close; base execution next session close to next execution close.
+WITH available_prices AS (
+ SELECT * FROM prices WHERE date <= $end
+), calendar AS (
+ SELECT date, LEAD(date) OVER (ORDER BY date) AS next_session,
+        LEAD(date, 5) OVER (ORDER BY date) AS day5,
+        LEAD(date, 65) OVER (ORDER BY date) AS day65
+ FROM available_prices WHERE ticker = 'SPY'
+), week_dates AS (
+ SELECT MAX(date) AS date FROM calendar GROUP BY date_trunc('week', date)
+), schedule AS (
+ SELECT w.date, c.next_session AS entry_date, c.day5, c.day65,
+        LEAD(w.date) OVER (ORDER BY w.date) AS next_date,
+        LEAD(c.next_session) OVER (ORDER BY w.date) AS exit_date
+ FROM week_dates w JOIN calendar c USING(date)
+), daily AS (
+ SELECT *, AVG(close * volume) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS adv,
+ COUNT(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS n20
+ FROM available_prices WHERE close > 0 AND adj_close > 0
 )
 INSERT INTO panel
-    (date, ticker, close, adj_close, adv20_usd, tradable, ret_fwd_1w, ret_fwd_1w_lag1, ret_fwd_13w)
-SELECT
-    date, ticker, close, adj_close, adv20_usd,
-    close >= $min_price AND adv20_usd >= $min_adv AND n20 = 20                AS tradable,
-    adj_close_nw  / adj_close     - 1.0                                       AS ret_fwd_1w,
-    adj_close_nw  / adj_close_t1  - 1.0                                       AS ret_fwd_1w_lag1,
-    adj_close_t65 / adj_close     - 1.0                                       AS ret_fwd_13w
-FROM weekly_lead
-WHERE adj_close > 0;
+SELECT d.date, d.ticker, d.close, d.adj_close, d.adv,
+ d.close >= $min_price AND d.adv >= $min_adv AND d.n20 = 20,
+ CASE WHEN n.adj_close > 0 THEN n.adj_close / d.adj_close - 1 END,
+ CASE WHEN e.adj_close > 0 AND x.adj_close > 0 THEN x.adj_close / e.adj_close - 1 END,
+ CASE WHEN h.adj_close > 0 THEN h.adj_close / d.adj_close - 1 END
+FROM daily d JOIN schedule s USING(date)
+LEFT JOIN available_prices n ON n.ticker=d.ticker AND n.date=s.next_date
+LEFT JOIN available_prices e ON e.ticker=d.ticker AND e.date=s.entry_date
+LEFT JOIN available_prices x ON x.ticker=d.ticker AND x.date=s.exit_date
+LEFT JOIN available_prices h ON h.ticker=d.ticker AND h.date=s.day65
+WHERE d.date >= $start;

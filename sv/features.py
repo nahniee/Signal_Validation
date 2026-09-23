@@ -8,7 +8,7 @@ from sv import db
 def build_panel(con) -> None:
     con.execute("DELETE FROM panel")
     db.run_sql_file(con, "build_panel", {"min_price": config.MIN_PRICE, "min_adv": config.MIN_ADV_USD,
-                                         "start": config.BACKTEST_START})
+                                         "start": config.BACKTEST_START, "end": config.EVALUATION_END})
 
 
 def rebalance_dates(con) -> list[pd.Timestamp]:
@@ -17,10 +17,12 @@ def rebalance_dates(con) -> list[pd.Timestamp]:
 
 def load_wide(con, field: str = "adj_close", start: str | None = None) -> pd.DataFrame:
     """T x N matrix of a price field for the whole universe (daily)."""
-    q = f"SELECT date, ticker, {field} AS v FROM prices WHERE {field} > 0"
+    q = f"SELECT date, ticker, {field} AS v FROM prices WHERE {field} > 0 AND date <= $end"
+    params = {"end": config.EVALUATION_END}
     if start:
         q += " AND date >= $start"
-    df = db.read(con, q, {"start": start} if start else None)
+        params["start"] = start
+    df = db.read(con, q, params)
     return df.pivot(index="date", columns="ticker", values="v").sort_index()
 
 

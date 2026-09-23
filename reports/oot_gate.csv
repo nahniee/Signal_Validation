@@ -1,0 +1,11 @@
+model,CAGR ungated / gated,max DD ungated / gated,Sharpe ungated / gated,off
+momentum,37.8% / 26.8%,-28.6% / -28.2%,0.99 / 0.91,33.6%
+gbm,10.5% / 0.0%,-37.1% / 0.0%,0.47 / n/a,100.0%
+gbm_expected,18.4% / 3.5%,-34.5% / -21.5%,0.61 / 0.30,85.9%
+gbm_weekly,22.9% / 1.9%,-39.6% / -36.3%,0.71 / 0.21,61.0%
+clam_2021,17.2% / 0.0%,-32.4% / 0.0%,0.63 / n/a,100.0%
+clam_weekly_cs_demeaned,-4.1% / 0.0%,-50.6% / 0.0%,0.01 / n/a,100.0%
+clam_weekly_cs_rank_small,10.3% / 0.0%,-27.8% / 0.0%,0.52 / n/a,100.0%
+clam_weekly_cs_rank_small_n94_seed20260922,9.2% / 0.0%,-49.8% / 0.0%,0.42 / n/a,100.0%
+clam_weekly_cs_rank_small_n500_seed20260922,11.0% / 0.0%,-32.8% / 0.0%,0.55 / n/a,100.0%
+clam_weekly_cs_rank_small_n3000_seed20260922,-0.3% / 0.0%,-25.5% / 0.0%,0.06 / n/a,100.0%

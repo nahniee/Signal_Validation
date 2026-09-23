@@ -13,10 +13,10 @@ WITH labelled AS (
     SELECT
         s.date, s.score,
         EXTRACT(year FROM s.date)                                               AS yr,
-        p.ret_fwd_1w > MEDIAN(p.ret_fwd_1w) OVER (PARTITION BY p.date)          AS y
+        p.ret_fwd_1w_lag1 > MEDIAN(p.ret_fwd_1w_lag1) OVER (PARTITION BY p.date)          AS y
     FROM signals s
     JOIN panel p USING (date, ticker)
-    WHERE s.model = $model AND p.tradable AND p.ret_fwd_1w IS NOT NULL AND s.score IS NOT NULL
+    WHERE s.model = $model AND p.tradable AND p.ret_fwd_1w_lag1 IS NOT NULL AND s.score IS NOT NULL
 ),
 ranked AS (
     SELECT

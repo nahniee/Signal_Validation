@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS panel (
     adv20_usd        DOUBLE,            -- 20-day average dollar volume (liquidity filter)
     tradable         BOOLEAN,           -- passes MIN_PRICE and MIN_ADV_USD
     ret_fwd_1w       DOUBLE,            -- next-week total return, rebalance close -> next rebalance close
-    ret_fwd_1w_lag1  DOUBLE,            -- same but entered one trading day later (execution-lag sensitivity)
+    ret_fwd_1w_lag1  DOUBLE,            -- next-session close to following next-session close (base execution)
     ret_fwd_13w      DOUBLE,            -- 65-trading-day forward return (candidate models' horizon)
     PRIMARY KEY (date, ticker)
 );

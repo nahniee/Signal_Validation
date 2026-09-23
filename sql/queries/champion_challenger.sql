@@ -29,7 +29,7 @@ SELECT
     EXP(52.0 * AVG(LN(1 + ret_net))) - 1                AS cagr,
     STDDEV_SAMP(ret_net) * SQRT(52)                     AS vol,
     AVG(ret_net) / STDDEV_SAMP(ret_net) * SQRT(52)      AS sharpe,
-    MIN(EXP(log_eq - log_peak) - 1)                     AS max_drawdown,
+    MIN(EXP(log_eq - GREATEST(log_peak, 0)) - 1)                     AS max_drawdown,
     EXP(SUM(LN(1 + ret_net))) - 1                       AS total_return
 FROM eq
 GROUP BY strategy

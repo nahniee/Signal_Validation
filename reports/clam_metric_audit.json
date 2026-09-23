@@ -1,0 +1,12 @@
+{
+  "model": "clam_2021",
+  "sample": "first 100 alphabetical tickers, OOT starts every 65 sessions, complete targets only",
+  "observation_cutoff": "2026-08-28",
+  "windows": 1478,
+  "daily_close_targets": 96070,
+  "legacy_scaled_sign_accuracy": 0.5907775580306027,
+  "inverse_scaled_return_direction_accuracy": 0.4978661392734465,
+  "scaled_zero_close": 0.010074820986082367,
+  "model_sha256": "3c234e77bb306db29488addf326293b946051a5dbe346584a241383472b20cd5",
+  "limitation": "Frozen historical weights; not the old training/validation set; no causal attribution or skill test."
+}

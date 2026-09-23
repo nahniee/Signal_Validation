@@ -1,5 +1,5 @@
-"""Candidate 2: CLAM (CNN+LSTM+Attention) 65-day forecast, scored exactly as
-deployed in Long_Term_Trading/clam_inference.py:
+"""CLAM (CNN, LSTM and attention) 65-day forecast, scored as deployed in
+Long_Term_Trading/clam_inference.py:
 
     features = [dlog Open, dlog High, dlog Low, dlog Close, dlog1p Volume]  (raw, unadjusted)
     input    = last 252 rows, MinMax-scaled with the training scaler
@@ -7,7 +7,7 @@ deployed in Long_Term_Trading/clam_inference.py:
     score    = exp( sum_{h=1..65} pred_dlog_High_h ) - 1     ("expected growth")
 
 Two weight sets are evaluated:
-    clam_orig : Quant_Model_Research/quarterly_model.h5  (trained through 2025-08 -> in-sample before that)
+    clam_orig : Quant_Model_Research/quarterly_model.h5  (original artifacts absent here; training cutoff unverified)
     clam_2021 : models/clam_2021_model.h5                 (same code, training cut at 2021-12-31)
 
 Inference is batched per rebalance date over tradable tickers only, and written

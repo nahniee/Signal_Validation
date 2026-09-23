@@ -1,5 +1,6 @@
-"""Candidate 3 (benchmark rule): classic 12-1 cross-sectional momentum.
-score = P[t-21] / P[t-252] - 1 on adjusted close. No parameters were tuned here."""
+"""Untuned 12-1 cross-sectional momentum, used as the benchmark rule.
+
+score = P[t-21] / P[t-252] - 1 on adjusted close."""
 import numpy as np
 import pandas as pd
 import config

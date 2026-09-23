@@ -9,3 +9,5 @@ joblib
 matplotlib
 tqdm
 seaborn             # imported by Quant_Model_Research/clam_workflow.py
+
+nbformat>=5.10    # executed validation workpapers

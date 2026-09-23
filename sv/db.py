@@ -6,7 +6,7 @@ Conventions
   * DATE columns come back as pandas datetime64[ns]; config dates are ISO strings
     and DuckDB casts them on comparison, so `WHERE date >= $start` just works
   * DuckDB allows one writing process per database file. Run scripts one at a
-    time; open the file with read_only=True from notebooks while a script runs.
+    time; close a separate-process writer before opening notebooks/readers.
 """
 import os
 from pathlib import Path

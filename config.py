@@ -1,5 +1,4 @@
-"""Project-wide constants. Everything that is a modelling *assumption* lives here
-so the validation report can cite a single source of truth."""
+"""Modelling and evaluation assumptions in one place, cited by the validation report."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -11,52 +10,57 @@ MODELS_DIR = ROOT / "models"
 REPORTS_DIR = ROOT / "reports"
 FIG_DIR = REPORTS_DIR / "figures"
 
-# Sibling checkout of the original model repo (deployed CLAM weights + training code)
+# Sibling checkout holding the CLAM training code and weights under review.
 QMR_DIR = ROOT.parent / "Quant_Model_Research"
 
-# --- Universe --------------------------------------------------------------
-UNIVERSE_SIZE = 3000            # top-N US-listed equities by market cap (Russell 3000 proxy)
-UNIVERSE_ASOF = "2026-09-15"    # screener snapshot date -> survivorship bias, see report §Limitations
+# Universe: current top-N US listings by market cap, so delisted names are absent.
+UNIVERSE_SIZE = 3000
+UNIVERSE_ASOF = "2026-09-15"
 EXCHANGES = ["NMS", "NYQ", "NGM", "NCM", "ASE"]
 
-# --- Price history ---------------------------------------------------------
-PRICE_START = "2013-01-01"      # 2y warm-up before backtest start
-PRICE_END = "2026-09-15"      # exclusive in yfinance -> last bar 2026-09-14 (snapshot frozen for reproducibility)
+# Price history, with two warm-up years before the first signal.
+PRICE_START = "2013-01-01"
+PRICE_END = "2026-08-29"        # exclusive in yfinance: last observation is 2026-08-28
 
-# --- Backtest ----------------------------------------------------------------
+# Backtest: signal at week-end close, traded at the next session close.
 BACKTEST_START = "2015-01-02"
-REBALANCE = "W-FRI"             # weekly, signal computed on Friday close, traded next open
 HOLD_TOP_N = 50                 # long-only, equal weight
-COST_BPS = 10                   # one-way: 5 bps commission/spread + 5 bps slippage
+COST_BPS = 10                   # one-way commission, spread and slippage
 BENCHMARK = "SPY"
 
-# Liquidity filter applied at every rebalance date (tradability, not alpha)
+# Tradability filter applied at every signal date.
 MIN_PRICE = 5.0
 MIN_ADV_USD = 5_000_000         # 20-day average dollar volume
 
-# --- Candidate models (fixed, no tuning: this repo is the judge, not the modeller)
-MOM_LOOKBACK, MOM_SKIP = 252, 21          # classic 12-1 momentum
-GBM_LOOKBACK, GBM_HORIZON = 504, 65       # 2y daily lookback, 65-day path: Long_Term_Trading.get_gbm_path_simulation
-CLAM_SEQ_LEN, CLAM_HORIZON = 252, 65      # matches Quant_Model_Research CONFIG['quarterly']
+# Candidate parameters, fixed rather than tuned here.
+MOM_LOOKBACK, MOM_SKIP = 252, 21          # 12-1 momentum
+GBM_LOOKBACK, GBM_HORIZON = 730, 63       # calendar-day lookback, original 63-step path
+CLAM_SEQ_LEN = 252
 CLAM_ORIGINAL_H5 = QMR_DIR / "quarterly_model.h5"
 CLAM_ORIGINAL_SCALER = QMR_DIR / "quarterly_scaler.pkl"
-CLAM_ORIGINAL_TRAIN_END = "2025-08-22"    # file mtime; data before this is in-sample
-CLAM_RETRAIN_CUTOFF = "2021-12-31"        # retrained twin -> ~4.7y out-of-time
+CLAM_RETRAIN_CUTOFF = "2021-12-31"        # cutoff for the retrained twin
 
-# --- Validation -------------------------------------------------------------
-OOT_START = "2022-01-03"        # out-of-time window for champion/challenger
-N_TRIALS_DSR = 11               # round 1: 3 candidates; round 2 adds 6 GBM-weekly variants + CLAM-weekly + clam_2021 twin
-BOOTSTRAP_BLOCK = 13            # weeks (~1 quarter) for stationary block bootstrap
+# Validation window and test settings.
+OOT_START = "2022-01-03"
+EVALUATION_END = "2026-08-28"   # holding periods unfinished by this date are excluded
+N_TRIALS_DSR = 17               # 14 historical trials plus the 94/500/3000 universe-size runs
+EXECUTION_RETURN = "ret_fwd_1w_lag1"
+MONITOR_RETURN_LAG = 2          # the last delayed holding period is incomplete at signal close
+BOOTSTRAP_BLOCK = 13            # weeks (~1 quarter)
 BOOTSTRAP_N = 5000
 PSI_BUCKETS = 10
-MONITOR_WINDOW = 52             # rolling weeks for PSI/KS/AUC
+MONITOR_WINDOW = 52             # rolling weeks for PSI, KS and AUC
+VALIDATION_MODELS = ["momentum", "gbm", "gbm_expected", "gbm_weekly", "clam_2021",
+                     "clam_weekly_cs_demeaned", "clam_weekly_cs_rank_small",
+                     "clam_weekly_cs_rank_small_n94_seed20260922",
+                     "clam_weekly_cs_rank_small_n500_seed20260922",
+                     "clam_weekly_cs_rank_small_n3000_seed20260922"]
 
-# --- Kill switch (gate) -------------------------------------------------------
-# Signal is switched OFF for the coming week if ANY rule trips. Thresholds follow
-# common model-monitoring conventions and were fixed before the OOT evaluation.
+# Kill switch: the signal is held in cash for the coming week if any rule trips.
+# Thresholds follow documented conventions; historical preregistration is not established.
 GATE_RULES = {
-    "psi_score":       (">", 0.25),   # score distribution has shifted vs development sample
+    "psi_score":       (">", 0.25),   # score distribution shifted vs the development sample
     "rolling_sharpe":  ("<", 0.0),    # trailing 52w active Sharpe negative
-    "auc_1w":          ("<", 0.50),   # no discriminatory power over trailing 52w
-    "active_drawdown": ("<", -0.15),  # relative drawdown vs universe beyond tolerance
+    "auc_1w":          ("<", 0.50),   # no discriminatory power over the trailing 52w
+    "active_drawdown": ("<", -0.15),  # relative drawdown beyond tolerance
 }

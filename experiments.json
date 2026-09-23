@@ -1,0 +1,100 @@
+{
+  "count_policy": "17 documented trials is a lower bound, including three predeclared universe-size experiments (94/500/3000). Missing historical trials remain disclosed.",
+  "trials": [
+    {
+      "model": "momentum",
+      "family": "baseline",
+      "status": "available"
+    },
+    {
+      "model": "gbm",
+      "family": "baseline",
+      "status": "available"
+    },
+    {
+      "model": "gbm_expected",
+      "family": "baseline",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_63_expected",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_63_prob_up",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_126_expected",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_126_prob_up",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_252_expected",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "gbm_w_252_prob_up",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "clam_weekly_raw",
+      "family": "weekly redevelopment",
+      "status": "missing historical scores"
+    },
+    {
+      "model": "clam_weekly_raw_wbars",
+      "family": "weekly redevelopment",
+      "status": "discarded constant; missing artifact/scores"
+    },
+    {
+      "model": "clam_weekly_cs_demeaned",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "clam_weekly_cs_rank_small",
+      "family": "weekly redevelopment",
+      "status": "available"
+    },
+    {
+      "model": "clam_2021",
+      "family": "original methodology twin",
+      "status": "available"
+    },
+    {
+      "model": "clam_weekly_cs_rank_small_n94_seed20260922",
+      "family": "training-universe experiment",
+      "status": "trained, scored and evaluated"
+    },
+    {
+      "model": "clam_weekly_cs_rank_small_n500_seed20260922",
+      "family": "paired training-universe expansion",
+      "status": "trained, scored and evaluated",
+      "seed": 20260922,
+      "training_cutoff": "2021-12-31",
+      "evaluation_cutoff": "2026-08-28",
+      "selection": "fixed historical cs_rank_small architecture; no OOT tuning",
+      "changes": "same seed, finite windows and purged validation boundary in both paired sizes"
+    },
+    {
+      "model": "clam_weekly_cs_rank_small_n3000_seed20260922",
+      "family": "paired training-universe expansion",
+      "status": "trained, scored and evaluated",
+      "seed": 20260922,
+      "training_cutoff": "2021-12-31",
+      "evaluation_cutoff": "2026-08-28",
+      "selection": "fixed historical cs_rank_small architecture; no OOT tuning",
+      "changes": "same seed, finite windows and purged validation boundary in both paired sizes"
+    }
+  ]
+}

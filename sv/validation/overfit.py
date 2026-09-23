@@ -1,22 +1,20 @@
-"""Question 1 - is the backtest real or overfit?
+"""Evidence that a candidate's out-of-time record is not explained by chance.
 
-Three complementary tests on weekly *active* returns (strategy - equal-weight
-tradable universe, which removes the survivorship/universe effect shared by all
-candidates and isolates selection skill):
+All three tests run on weekly active returns (strategy minus the equal-weighted
+tradable universe), which controls some shared universe exposure but neither removes
+survivorship bias nor measures it.
 
-1. Stationary block bootstrap (Politis & Romano 1994) confidence interval for
-   the annualised Sharpe ratio. Blocks ~1 quarter preserve autocorrelation and
-   volatility clustering that an i.i.d. bootstrap would destroy.
-2. Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014): probability that the
-   observed Sharpe exceeds the Sharpe one would expect from the *best of N* noise
-   strategies, correcting for non-normality (skew, kurtosis) and sample length.
-3. Cross-sectional permutation null: shuffle scores across tickers within each
-   rebalance date (keeps every return, every date, the same universe and the
-   same top-N mechanics) and rebuild the portfolio. The empirical p-value is
-   the share of permuted Sharpes >= observed. Compared on *gross* returns: a
-   shuffled signal turns the book over ~100% a week, so net of costs the null
-   would be dragged far below zero and a persistent signal would pass on cost
-   savings alone rather than on selection skill.
+Stationary block bootstrap (Politis & Romano 1994) gives a confidence interval for the
+annualised Sharpe ratio; quarter-length blocks preserve the autocorrelation and
+volatility clustering an i.i.d. bootstrap would destroy.
+
+Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014) is the probability that the observed
+Sharpe exceeds the best of N noise strategies, adjusted for skew, kurtosis and sample length.
+
+The cross-sectional permutation null resamples holdings within each signal date, keeping
+the dates, universe and top-N mechanics, and compares gross returns: a shuffled signal
+turns the book over almost completely each week, so a net-return comparison would reward
+low turnover rather than selection.
 """
 import numpy as np
 import pandas as pd
@@ -36,11 +34,10 @@ def sharpe(r: pd.Series | np.ndarray, ann: int = ANN) -> float:
 def active_returns(con, strategy: str, bench: str = "universe_ew") -> pd.Series:
     df = db.read(con, """SELECT s.date, s.ret_net - b.ret_net AS active
                          FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = $b
-                         WHERE s.strategy = $s ORDER BY s.date""", {"s": strategy, "b": bench})
+                         WHERE s.strategy = $s AND s.date >= $start ORDER BY s.date""", {"s": strategy, "b": bench, "start": config.OOT_START})
     return df.set_index("date")["active"]
 
 
-# ---------------------------------------------------------------- 1. bootstrap
 def stationary_bootstrap_indices(n: int, block: float, rng: np.random.Generator) -> np.ndarray:
     """Politis-Romano: geometric block lengths with mean `block`, wrapping."""
     p = 1.0 / block
@@ -63,7 +60,6 @@ def bootstrap_sharpe_ci(r: pd.Series, n_boot: int = config.BOOTSTRAP_N, block: f
             "detail": f"stationary block bootstrap, block={block}w, n={n_boot}, T={len(x)}w"}
 
 
-# ---------------------------------------------------------------- 2. deflated SR
 def probabilistic_sharpe(sr: float, sr_bench: float, T: int, skew: float, kurt: float) -> float:
     """PSR: P(true SR > sr_bench). sr, sr_bench in per-period units. kurt = raw (3 for normal)."""
     denom = np.sqrt(1 - skew * sr + (kurt - 1) / 4 * sr ** 2)
@@ -94,22 +90,26 @@ def deflated_sharpe(r: pd.Series, trial_sharpes_ann: list[float], n_trials: int 
                       f"kurt={stats.kurtosis(x, fisher=False):.1f}, T={T}w"}
 
 
-# ---------------------------------------------------------------- 3. permutation
 def permutation_null(con, model: str, n_perm: int = 500, seed: int = 0, bench: str = "universe_ew") -> dict:
     panel = backtest._panel(con, model).dropna(subset=["score"])
+    panel = panel[panel.date >= pd.Timestamp(config.OOT_START)]
     ew = db.read(con, "SELECT date, ret_gross FROM portfolio_returns WHERE strategy = $b", {"b": bench}) \
            .set_index("date")["ret_gross"]
     obs_pr = backtest.portfolio_returns(backtest.top_n_weights(panel))
     obs = sharpe((obs_pr.set_index("date")["ret_gross"] - ew).dropna())
     rng = np.random.default_rng(seed)
-    g = panel.groupby("date", sort=False)
-    null = np.empty(n_perm)
-    for i in range(n_perm):
-        # shuffle scores within date: same universe, returns, costs; signal-return link broken
-        panel["score_perm"] = g["score"].transform(lambda s: rng.permutation(s.values))
-        pr = backtest.portfolio_returns(backtest.top_n_weights(panel, score_col="score_perm"))
-        null[i] = sharpe((pr.set_index("date")["ret_gross"] - ew).dropna())
-    p = float((null >= obs).mean())
+    groups = list(panel.groupby("date", sort=True))
+    null_returns = np.empty((n_perm, len(groups)))
+    for j, (date, group) in enumerate(groups):
+        returns = group[config.EXECUTION_RETURN].to_numpy()
+        if not np.isfinite(returns).all():
+            raise ValueError("Permutation universe contains missing realised returns")
+        k = min(config.HOLD_TOP_N, len(group))
+        # Exchangeability null conditional on this snapshot/universe; not a causal test.
+        for i in range(n_perm):
+            null_returns[i, j] = returns[rng.choice(len(returns), k, replace=False)].mean() - ew.loc[date]
+    null = null_returns.mean(axis=1) / null_returns.std(axis=1, ddof=1) * np.sqrt(ANN)
+    p = float((1 + (null >= obs).sum()) / (n_perm + 1))
     return {"statistic": obs, "ci_low": float(np.percentile(null, 2.5)), "ci_high": float(np.percentile(null, 97.5)),
             "p_value": p, "verdict": "PASS" if p < 0.05 else "FAIL",
             "detail": f"cross-sectional permutation on gross active return, n={n_perm}; "
@@ -125,13 +125,26 @@ def save_result(con, model: str, test: str, res: dict) -> None:
 
 def run_all(con, models: list[str], n_trials: int | None = None, n_perm: int = 500) -> pd.DataFrame:
     act = {m: active_returns(con, m) for m in models}
-    trial_sr = [sharpe(a) for a in act.values()]
+    import json
+    registry = json.loads((config.ROOT / "experiments.json").read_text())
+    trial_names = [x["model"] for x in registry["trials"]]
+    trial_series = {name: active_returns(con, name) for name in trial_names}
+    available = {name: values for name, values in trial_series.items() if len(values)}
+    missing = [name for name in trial_names if name not in available]
+    trial_sr = [sharpe(a) for a in available.values()]
+    n_trials = max(n_trials or 0, len(trial_names))
+
     rows = []
     for m in models:
         r = act[m]
         for test, res in (("bootstrap_sharpe_ci", bootstrap_sharpe_ci(r)),
                           ("deflated_sharpe", deflated_sharpe(r, trial_sr, n_trials)),
                           ("permutation_null", permutation_null(con, m, n_perm=n_perm))):
+            res["detail"] += f"; OOT >= {config.OOT_START}; next-session-close execution"
+            if test == "deflated_sharpe":
+                res["verdict"] = "PROVISIONAL"
+                res["detail"] += (f"; historical search incomplete; variance from {len(available)} available trials; "
+                                  f"missing={','.join(missing)}; N={n_trials} is a lower bound, not an approval test")
             save_result(con, m, test, res)
             rows.append({"model": m, "test": test, **{k: v for k, v in res.items() if k != "null"}})
             print(f"{m:14s} {test:20s} stat={res['statistic']:.3f} p={res['p_value']:.3f} {res['verdict']}  {res['detail']}", flush=True)

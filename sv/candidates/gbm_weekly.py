@@ -1,8 +1,8 @@
-"""Candidate 1b: GBM weekly v2, ported from Long_Term_Trading/gbm_weekly.py
-(vectorised over the whole universe). Six development variants are emitted:
-lookback {63, 126, 252} x score {expected, prob_up}; the one chosen on the
-development sample (< config.OOT_START) is aliased as 'gbm_weekly'. All six stay
-in `signals` so the Deflated Sharpe Ratio can count them as trials.
+"""Weekly GBM scores, vectorised from Long_Term_Trading/gbm_weekly.py.
+
+Six variants are emitted: lookback 63, 126 or 252 days by expected-return or
+probability-of-gain score. The variant chosen on the development sample is aliased as
+gbm_weekly; all six stay in signals so the Deflated Sharpe Ratio can count them as trials.
 """
 import numpy as np
 import pandas as pd

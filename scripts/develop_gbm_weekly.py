@@ -38,5 +38,5 @@ pd.set_option("display.width", 160); print(tab.round(3))
 best = tab.index[0]
 con.execute("INSERT INTO signals SELECT date, ticker, 'gbm_weekly' AS model, score FROM signals WHERE model = ?", [best])
 backtest.save(con, backtest.run_model(con, "gbm_weekly"))
-backtest.save(con, backtest.run_model(con, "gbm_weekly", strategy="gbm_weekly_lag1", ret_col="ret_fwd_1w_lag1"))
+backtest.save(con, backtest.run_model(con, "gbm_weekly", strategy="gbm_weekly_same_close", ret_col="ret_fwd_1w"))
 print(f"\nselected {best} -> 'gbm_weekly'  (development sample only; {len(gbm_weekly.VARIANTS)} trials)")

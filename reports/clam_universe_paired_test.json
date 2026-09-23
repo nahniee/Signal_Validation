@@ -1,0 +1,26 @@
+{
+  "control": 500,
+  "block_weeks": 13,
+  "draws": 5000,
+  "contrasts": [
+    {
+      "contrast": "94 minus matched 500 control; net weekly portfolio returns",
+      "annualized_mean_return_difference": 0.024826198821483587,
+      "ci_95": [
+        -0.14557377392873194,
+        0.2177991882911551
+      ],
+      "weeks": 241
+    },
+    {
+      "contrast": "3000 minus matched 500 control; net weekly portfolio returns",
+      "annualized_mean_return_difference": -0.12461161184178418,
+      "ci_95": [
+        -0.23062508132318477,
+        -0.012034570600388577
+      ],
+      "weeks": 241
+    }
+  ],
+  "limitation": "Single seed, reused OOT and later-universe snapshot. Not a general conclusion about training-set size."
+}

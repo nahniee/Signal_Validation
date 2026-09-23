@@ -1,0 +1,5 @@
+model,horizon_sessions,target,n,slope,intercept,mae,interpretation
+gbm,63,mean adjusted price over t..t+63 / price[t] - 1,470585,-0.004233052574360872,0.018354812765036282,0.1365755648067396,descriptive pooled OOT regression; overlapping/correlated observations; no significance claim
+gbm_expected,63,mean adjusted price over t..t+63 / price[t] - 1,470585,-0.07377443014950252,0.019219068612665566,0.09324597443690084,descriptive pooled OOT regression; overlapping/correlated observations; no significance claim
+gbm_weekly,5,adjusted close[t+5] / close[t] - 1,518297,-0.040597931266710956,0.0027960688765136313,0.0442328845940703,descriptive pooled OOT regression; overlapping/correlated observations; no significance claim
+clam_2021,65,raw High[t+65] / High[t] - 1,477325,0.0020606286852821727,0.031727365739081165,0.3678775685236909,descriptive pooled OOT regression; overlapping/correlated observations; no significance claim

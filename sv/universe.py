@@ -1,9 +1,8 @@
 """Build the tradable universe: top-N US-listed common equities by market cap.
 
 This is a *current* snapshot (Yahoo screener), so companies that were delisted
-before today are absent -> survivorship bias. Documented in the report; it
-biases every candidate model in the same direction, so relative rankings
-between candidates are less affected than absolute performance.
+before today are absent -> survivorship bias. Documented in the report; its impact can differ by strategy. Subtracting a shared benchmark does not
+remove it, and listing coverage does not quantify its performance impact.
 """
 import json
 import time

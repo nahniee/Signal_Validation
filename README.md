@@ -1,96 +1,71 @@
 # Signal Validation
 
-Independent, second-line validation of three deployed trading signals — the kind of review a bank's
-Model Risk Management team performs before a front-office model is approved for use.
+A self-validation case study of my earlier GBM and CLAM models, using the structure of a second-line model review. Developer and reviewer are the same person; this is not organizationally independent validation.
 
-The models under review are my own earlier work
-([Quant_Model_Research](https://github.com/nahniee/Quant_Model_Research),
-[Long_Term_Trading](https://github.com/nahniee/Long_Term_Trading)). This repository does **not**
-modify or tune them; it re-runs them as deployed on a 3,000-stock universe and asks the three
-questions a risk team asks:
+**Review story:** original quarterly implementations and their proposed weekly use → code/provenance findings → separately versioned weekly redevelopments → revalidation. The evidence does not establish that a correctly implemented quarterly strategy cannot work. A new horizon is a change of intended use, not merely a bug fix.
 
-| # | question | module | tests |
-|---|---|---|---|
-| Q1 | Is the backtest real or overfit? | `sv/validation/overfit.py` | block-bootstrap Sharpe CI · Deflated Sharpe Ratio · cross-sectional permutation null |
-| Q2 | Is the signal still valid today? | `sv/validation/monitoring.py` | rolling PSI · KS · AUC · calibration slope |
-| Q3 | When must it be switched off? | `sv/validation/gate.py` | rule-based kill switch, champion vs challenger out-of-time |
+## Current evidence and decision
 
-Final deliverable: an SR 11-7-style validation report (`reports/validation_report.md`) with
-findings, limitations, monitoring plan and prohibited-use conditions.
+**Evaluation end: 2026-08-28.** This is the last allowed price observation. Unfinished holding periods are excluded; archived later prices are not used.
 
-## Candidates
+See [the revised report](reports/validation_report.md), [PDF](reports/validation_report.pdf), and [workpapers](notebooks). No model is approved for production. Momentum is a comparator only. Conclusions are limited to tested specifications, the survivor-selected snapshot and the reused evaluation period.
 
-| model | origin | role |
-|---|---|---|
-| `gbm` | `Long_Term_Trading/stats_model_process.py` | deployed statistical model — single Monte-Carlo path score, reproduced verbatim |
-| `gbm_expected` | derived here | same model's closed-form expectation, to isolate the Monte-Carlo noise |
-| `clam_orig` | `Quant_Model_Research/quarterly_model.h5` | deployed CNN-LSTM-Attention model, weights as shipped |
-| `clam_2021` | `scripts/retrain_clam.py` | same training code, 94-ticker universe and architecture, window cut at 2021-12-31 — the deployed methodology given an honest out-of-time period |
-| `momentum` | textbook 12-1 momentum | untuned benchmark rule: a complex model that cannot beat it is not approved |
-| `gbm_weekly` | `Long_Term_Trading/gbm_weekly.py` (round 2) | redeveloped GBM: 5-day horizon, closed-form score; best of 6 variants on the development sample |
-| `clam_weekly_*` | `Quant_Model_Research/clam_weekly.py` (round 2) | redeveloped CLAM: per-ticker sequences, training cut 2021-12-31, weekly scalar target; two variants retained |
+- Q1: OOT-only stationary bootstrap and gross-return permutation test, 2022-01-03 through 2026-08-28.
+- DSR: provisional sensitivity with a minimum of 17 documented trials, including the 94/500/3000 training runs; two historical CLAM return series remain missing. See [experiment registry](experiments.json). Never reduce historical trial counts to gain approval.
+- Execution: signal at week-end close, trade at next-session close and hold to the following execution close; drift-aware traded-weight costs for candidates and the equal-weight comparator.
+- Q2: matured-target monitoring, PSI including tails, and target-matched descriptive calibration. Rank/de-meaned CLAM outputs are not calibrated raw returns.
+- Q3: lagged controls and actual gated-holdings costs; missing required metrics switch off. The gate is experimental.
+- CLAM: corrected original-return direction metric, same-prediction frozen-weight audit; historical weights preserved.
 
-**Outcome so far:** two validation rounds, nine candidate variants, none approved. Round 2 showed the GBM
-defect was an implementation error (the fixed model passes the noise tests but does not beat the benchmark)
-and that the CLAM methodology has no skill either as deployed (retrained with an honest cut-off) or after its data-construction defect is repaired.
-Details in `reports/validation_report.md` §12 and `notebooks/05_round2.ipynb`.
+The OOT window has already been examined in earlier work. It is a post-training historical evaluation, not a pristine holdout. Same-universe active returns do not remove survivorship bias.
 
-## Layout
+## Revalidate the existing snapshot
 
-```
-config.py                 every modelling assumption in one place (cited by the report)
-sql/schema.sql            DuckDB tables: universe -> prices -> panel -> signals -> portfolio_returns -> monitoring / gate_decisions / validation_results
-sql/queries/*.sql         set-based work lives in SQL: rebalance panel, realised vol, PSI, AUC via ranks, drawdown-based performance summary
-sv/                       Python library: ingest, features, backtest, candidates/, validation/
-scripts/                  long-running batch jobs (candidate scoring, CLAM retrain, GPU env)
-notebooks/00..05          validation workpapers: data quality, Q1, Q2, Q3, findings, round-2 revalidation
-reports/                  validation report + figures
-```
-
-## Reproduce
+From this directory, with the existing DuckDB database, saved scores and virtual environment:
 
 ```bash
-uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python -m sv.universe            # Yahoo screener snapshot (top-3000 by market cap)
-.venv/bin/python -m sv.ingest              # daily OHLCV 2013 -> today into DuckDB (~3 min)
-.venv/bin/python -m sv.features            # weekly rebalance panel (SQL window functions)
-.venv/bin/python scripts/run_candidates.py # momentum + GBM scores
-.venv/bin/python -m sv.backtest            # shared top-50 backtest, benchmarks
-.venv/bin/python -m sv.validation.overfit
-.venv/bin/python -m sv.validation.monitoring
-.venv/bin/python -m sv.validation.gate
+.venv/bin/python -m unittest discover -s tests -v
+sh scripts/revalidate.sh
+. scripts/gpu_env.sh
+.venv/bin/python scripts/audit_clam_metric.py
+.venv/bin/python scripts/build_report.py
 ```
 
-CLAM needs the original artefacts next to this repo (`../Quant_Model_Research/quarterly_model.h5`,
-`quarterly_scaler.pkl`, `clam_model.py`, `clam_workflow.py`) and TensorFlow with a GPU:
+The first script preserves weekly candidate choices and CLAM weights. It rebuilds the panel, controlled 63-step GBM reproduction, backtests, OOT tests, monitoring, gates and report. Do not run another writer or reader from a separate process against DuckDB during a writing job. The original `clam_orig` artifacts are absent; their training cutoff is unverified. `clam_2021` artifacts exist locally. Missing discarded CLAM runs are disclosed, not silently treated as recovered.
+
+Generated evidence: `reports/oot_*.csv`, `latest_monitoring.csv`, `matched_calibration.csv`, `clam_metric_audit.json`, `review_manifest.json`, Markdown/PDF report and six figures. Workpapers 00–05 read these revised tables. Tests exercise the changed timing/accounting/statistical contracts.
+
+## New data or model development
+
+Install `requirements.txt` in a Python 3.12 environment if needed. `sv.universe`, `sv.ingest`, and `sv.features` build a **new** live-data snapshot; a new download is not exact reproduction of the existing frozen one. Preserve the original snapshot and its provenance for comparisons.
+
+Original-model training defaults to the corrected direction metric; `scripts/retrain_clam.py` explicitly retains the legacy metric for an original-methodology twin. The historical cross-ticker sequence defect remains in that original training path. Weekly per-ticker redevelopment is in `../Quant_Model_Research/clam_weekly.py`. Any retraining, changed selection or new variant requires a new artifact/version, an appended experiment record and untouched evaluation data. `scripts/develop_gbm_weekly.py` is a development tool, not part of the frozen revalidation command.
+
+## Remaining limitations
+
+Today's 3,000-name market-cap snapshot omits historical failures and uses future membership information, including in CLAM's training-universe choice. Fixed 10 bps costs and next-close fills are still assumptions; capacity and market impact are unvalidated. The evaluation ends on 2026-08-28: later prices are excluded and only holding periods completed by that date are evaluated. Historical search records and original-weight provenance are incomplete. None of these limitations is resolved by a favorable Sharpe or a failed null test.
+
+## Training-universe experiment
+
+Three separately saved runs share the small weekly rank-target architecture, seed
+20260922 and a purged validation split, and differ only in training-universe size:
+94, 500 and 3000 names by market-cap rank. The 94 rung matches the size of the original
+hand-picked training list, which was chosen under compute constraints. Only data through
+2021-12-31 enter training and model selection, and the historical weights are preserved.
 
 ```bash
 . scripts/gpu_env.sh
-.venv/bin/python -m sv.candidates.clam clam_orig
-.venv/bin/python scripts/retrain_clam.py && .venv/bin/python -m sv.candidates.clam clam_2021
+.venv/bin/python scripts/train_clam_universe.py 94
+.venv/bin/python scripts/train_clam_universe.py 500
+.venv/bin/python scripts/train_clam_universe.py 3000
+sh scripts/run_clam_universe_evaluation.sh
 ```
 
-Then re-run backtest / overfit / monitoring / gate with the CLAM model names as arguments.
-
-Round 2 (redeveloped weekly models):
-
-```bash
-.venv/bin/python scripts/develop_gbm_weekly.py                 # 6 GBM-weekly variants, picks one on the dev sample
-(cd ../Quant_Model_Research && ../Signal_Validation/.venv/bin/python clam_weekly.py cs_demeaned)
-(cd ../Quant_Model_Research && ../Signal_Validation/.venv/bin/python clam_weekly.py cs_rank small)
-.venv/bin/python -m sv.candidates.clam_weekly cs_demeaned
-.venv/bin/python -m sv.candidates.clam_weekly cs_rank_small
-sh scripts/revalidate.sh
-```
-
-DuckDB allows one writing process at a time: run the CLAM trainer (which reads the database) before or
-after, not during, a scoring job.
-
-## Data caveats (carried into the report)
-
-* **Survivorship bias** — the universe is today's listings; delisted names are absent. Quantified in
-  `notebooks/00_data_quality.ipynb`; all pass/fail decisions use active return vs the same universe.
-* **Liquidity** — price ≥ $5 and 20-day ADV ≥ $5M at every rebalance; the filtered set is the only
-  approved scope of use.
-* **Costs** — 10 bps one-way on traded weight; a one-day execution lag variant (`*_lag1`) is kept
-  as a sensitivity.
+The trainer refuses to overwrite a completed run. Results are in
+`reports/clam_universe_comparison.csv` and `clam_universe_paired_test.json`, and every run
+counts toward the experiment registry regardless of outcome. Expanding to 3000 names is
+worse than the 500-name control, while 94 and 500 are not distinguishable on this sample,
+so the original 94-name list is not evidence of a training-size constraint. A smaller
+universe is also a smaller ranking peer group, so validation rank IC is not comparable
+across rungs on equal terms. One seed and a reused evaluation period cannot establish a
+general size effect.

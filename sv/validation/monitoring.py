@@ -1,24 +1,20 @@
-"""Question 2 - is the signal still valid? Rolling model-monitoring metrics in
-the vocabulary of bank model-risk reports.
+"""Rolling monitoring metrics in the vocabulary of bank model-risk reports.
 
-For every model and every rebalance date t we compute, on the trailing
-MONITOR_WINDOW weeks of pooled cross-sections (only information available at t):
+Every metric for signal date t uses the trailing MONITOR_WINDOW weeks of pooled
+cross-sections, and only targets that have matured by t.
 
-  psi_score   Population Stability Index of the model *score* distribution vs the
-              development sample (first 104 weeks). Bins fixed on the dev sample.
-              Rule of thumb: <0.10 stable, 0.10-0.25 watch, >0.25 shifted.
-  psi_input   PSI of the main model input (trailing 252d realised vol) - a
-              regime measure shared by all candidates.
-  auc_1w      Discriminatory power of the score for next-week direction
-              (y = ret_fwd_1w > cross-sectional median). 0.5 = no skill.
-  ks_1w       Kolmogorov-Smirnov separation between score CDFs of y=1 vs y=0.
-  auc_13w / ks_13w  same at the model's stated 65-day horizon (target known
-              only 13 weeks later, so these are lagged by 13 weeks when used
-              for gating).
-  calib_slope OLS slope of realised 13w return on predicted score (for GBM/CLAM
-              whose score *is* an expected return; 1.0 = perfectly calibrated).
-  rolling_sharpe  52w annualised Sharpe of active return vs universe_ew.
-  drawdown    current drawdown of the net strategy equity curve.
+  psi_score              Population Stability Index of the score distribution against the
+                         development sample (first 104 weeks), binned on that sample.
+                         Below 0.10 stable, 0.10-0.25 watch, above 0.25 shifted.
+  psi_input              PSI of trailing 252-day realised volatility, a regime measure
+                         shared by every candidate.
+  auc_1w, ks_1w          Separation of next-week winners from losers, where a winner beats
+                         the cross-sectional median. AUC 0.5 is no discriminatory power.
+  auc_13w, ks_13w        The same at the 65-day horizon, using exact target-maturity dates.
+  association_slope_13w  Descriptive regression of realised on predicted, not calibration:
+                         targets and units differ across candidates.
+  rolling_sharpe         52-week annualised Sharpe of active return against universe_ew.
+  drawdown               Current drawdown of the net strategy equity curve.
 """
 import numpy as np
 import pandas as pd
@@ -30,10 +26,16 @@ DEV_WEEKS = 104
 W = config.MONITOR_WINDOW
 
 
-# ------------------------------------------------------------------ PSI / KS
 def psi(expected: np.ndarray, actual: np.ndarray, bins: int = config.PSI_BUCKETS, edges=None) -> float:
     if edges is None:
         edges = np.unique(np.quantile(expected, np.linspace(0, 1, bins + 1)))
+    # Infinite tails keep drifted observations inside the probability distribution.
+    expected = np.asarray(expected); actual = np.asarray(actual)
+    expected = expected[np.isfinite(expected)]; actual = actual[np.isfinite(actual)]
+    if not len(expected) or not len(actual):
+        return np.nan
+    interior = np.unique(np.asarray(edges)[1:-1])
+    edges = np.r_[-np.inf, interior, np.inf]
     e = np.histogram(expected, edges)[0] / len(expected)
     a = np.histogram(actual, edges)[0] / len(actual)
     e, a = np.clip(e, 1e-4, None), np.clip(a, 1e-4, None)
@@ -54,12 +56,13 @@ def auc(score: np.ndarray, y: np.ndarray) -> float:
     return float(roc_auc_score(y, score)) if 0 < y.mean() < 1 else np.nan
 
 
-# ------------------------------------------------------------------ data
 def load_scored_panel(con, model: str) -> pd.DataFrame:
     return db.read(con, """
-        SELECT p.date, p.ticker, s.score, p.ret_fwd_1w, p.ret_fwd_13w
+        WITH maturity AS (SELECT date, LEAD(date,65) OVER (ORDER BY date) AS target_date_13w FROM prices WHERE ticker='SPY' AND date <= $end)
+        SELECT p.date, p.ticker, s.score, p.ret_fwd_1w_lag1 AS ret_fwd_1w, p.ret_fwd_13w, t.target_date_13w
         FROM panel p JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = $m
-        WHERE p.tradable ORDER BY p.date""", {"m": model})
+        JOIN maturity t ON t.date=p.date
+        WHERE p.tradable AND p.date <= $end ORDER BY p.date""", {"m": model, "end": config.EVALUATION_END})
 
 
 def realised_vol_panel(con) -> pd.DataFrame:
@@ -67,7 +70,6 @@ def realised_vol_panel(con) -> pd.DataFrame:
     return db.run_sql_file(con, "realised_vol")
 
 
-# ------------------------------------------------------------------ rolling
 def rolling_metrics(con, model: str) -> pd.DataFrame:
     df = load_scored_panel(con, model)
     df["y1"] = (df.ret_fwd_1w > df.groupby("date").ret_fwd_1w.transform("median")).astype(float)
@@ -83,21 +85,24 @@ def rolling_metrics(con, model: str) -> pd.DataFrame:
     vol_by_date = {d: g.vol252.dropna().values for d, g in vol.groupby("date")}
 
     rows = []
-    for i in range(W, len(dates)):
-        win = dates[i - W:i]                            # trailing window, excludes current week
+    for i in range(max(W + 1, DEV_WEEKS), len(dates)):
+        win = dates[i - W - 1:i - 1]                            # excludes the latest unfinished delayed holding period
         g = pd.concat([by_date[d] for d in win])
         cur = g.dropna(subset=["score"])
         m = {"psi_score": psi(dev.score.values, cur.score.values, edges=edges),
              "psi_input": psi(vol_dev, np.concatenate([vol_by_date.get(d, []) for d in win]), edges=vol_edges)}
         g1 = g.dropna(subset=["score", "ret_fwd_1w"])
         m["auc_1w"], m["ks_1w"] = auc(g1.score.values, g1.y1.values), ks_stat(g1.score.values, g1.y1.values)
-        # 13w target only known 13 weeks after the rebalance -> use the window lagged by 13w
-        win13 = dates[max(0, i - W - 13):i - 13]
-        g13 = pd.concat([by_date[d] for d in win13]).dropna(subset=["score", "ret_fwd_13w"]) if win13 else g.iloc[:0]
+        # Use actual maturity dates, including holidays, rather than a fixed 13-week offset.
+        known = df[(df.date < dates[i]) & (df.target_date_13w <= dates[i])]
+        mature_dates = sorted(known.date.unique())[-W:]
+        g13 = known[known.date.isin(mature_dates)].dropna(subset=["score", "ret_fwd_13w"])
         if len(g13):
             m["auc_13w"], m["ks_13w"] = auc(g13.score.values, g13.y13.values), ks_stat(g13.score.values, g13.y13.values)
             x, y = g13.score.values, g13.ret_fwd_13w.values
-            m["calib_slope"] = float(np.polyfit(x, y, 1)[0]) if x.std() > 0 else np.nan
+            # Only a diagnostic association: scores here do not predict this exact target.
+            # GBM path-average != terminal return; CLAM High != Close; weekly != 65d.
+            m["association_slope_13w"] = float(np.polyfit(x, y, 1)[0]) if x.std() > 0 else np.nan
         rows.append({"date": dates[i], **m})
     out = pd.DataFrame(rows).melt(id_vars="date", var_name="metric", value_name="value")
     out["model"] = model
@@ -105,14 +110,14 @@ def rolling_metrics(con, model: str) -> pd.DataFrame:
 
 
 def portfolio_metrics(con, strategy: str, bench: str = "universe_ew") -> pd.DataFrame:
-    pr = db.read(con, """SELECT s.date, s.ret_net, s.ret_net - b.ret_net AS active
+    pr = db.read(con, """SELECT s.date, s.ret_net, b.ret_net AS benchmark, s.ret_net - b.ret_net AS active
                          FROM portfolio_returns s JOIN portfolio_returns b ON b.date = s.date AND b.strategy = $b
                          WHERE s.strategy = $s ORDER BY s.date""", {"s": strategy, "b": bench}).set_index("date")
     rs = pr.active.rolling(W).mean() / pr.active.rolling(W).std() * np.sqrt(52)
     eq = (1 + pr.ret_net).cumprod()
-    dd = eq / eq.cummax() - 1
-    rel = (1 + pr.active).cumprod()
-    rel_dd = rel / rel.cummax() - 1
+    dd = eq / eq.cummax().clip(lower=1.0) - 1
+    rel = (1 + pr.ret_net).cumprod() / (1 + pr.benchmark).cumprod()
+    rel_dd = rel / rel.cummax().clip(lower=1.0) - 1
     out = pd.DataFrame({"rolling_sharpe": rs, "drawdown": dd, "active_drawdown": rel_dd}).reset_index()
     out = out.melt(id_vars="date", var_name="metric", value_name="value").dropna()
     out["model"] = strategy
