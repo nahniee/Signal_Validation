@@ -54,16 +54,16 @@ The stationary bootstrap uses 5,000 draws with a mean block of 13 weeks, and a m
 
 | model | active SR [95% CI] | bootstrap | permutation p | permutation | DSR (provisional) |
 | --- | --- | --- | --- | --- | --- |
-| momentum | 0.90 [0.26, 1.53] | PASS | 0.020 | PASS | 0.390 |
+| momentum | 0.90 [0.26, 1.53] | PASS | 0.018 | PASS | 0.390 |
 | gbm | 0.06 [-0.80, 0.86] | FAIL | 0.084 | FAIL | 0.019 |
-| gbm_expected | 0.39 [-0.31, 1.12] | FAIL | 0.164 | FAIL | 0.086 |
-| gbm_weekly | 0.50 [-0.12, 1.15] | FAIL | 0.106 | FAIL | 0.129 |
-| clam_2021 | 0.36 [-0.37, 1.05] | FAIL | 0.136 | FAIL | 0.075 |
-| clam_weekly_cs_demeaned | -0.89 [-1.56, -0.19] | FAIL | 0.838 | FAIL | 0.000 |
-| clam_weekly_cs_rank_small | -0.09 [-0.82, 0.65] | FAIL | 0.323 | FAIL | 0.008 |
-| clam_weekly_cs_rank_small_n94_seed20260922 | 0.09 [-0.83, 1.01] | FAIL | 0.307 | FAIL | 0.022 |
-| clam_weekly_cs_rank_small_n500_seed20260922 | -0.04 [-0.80, 0.75] | FAIL | 0.267 | FAIL | 0.011 |
-| clam_weekly_cs_rank_small_n3000_seed20260922 | -0.99 [-1.65, -0.35] | FAIL | 0.902 | FAIL | 0.000 |
+| gbm_expected | 0.39 [-0.31, 1.12] | FAIL | 0.166 | FAIL | 0.086 |
+| gbm_weekly | 0.50 [-0.12, 1.15] | FAIL | 0.118 | FAIL | 0.129 |
+| clam_2021 | 0.36 [-0.37, 1.05] | FAIL | 0.142 | FAIL | 0.075 |
+| clam_weekly_cs_demeaned | -0.89 [-1.56, -0.19] | FAIL | 0.834 | FAIL | 0.000 |
+| clam_weekly_cs_rank_small | -0.09 [-0.82, 0.65] | FAIL | 0.309 | FAIL | 0.008 |
+| clam_weekly_cs_rank_small_n94_seed20260922 | 0.09 [-0.83, 1.01] | FAIL | 0.303 | FAIL | 0.022 |
+| clam_weekly_cs_rank_small_n500_seed20260922 | -0.04 [-0.80, 0.75] | FAIL | 0.257 | FAIL | 0.011 |
+| clam_weekly_cs_rank_small_n3000_seed20260922 | -0.99 [-1.65, -0.35] | FAIL | 0.888 | FAIL | 0.000 |
 
 The Deflated Sharpe Ratio is reported but doesn't decide anything yet. `experiments.json` lists at least 17 trials, including the three training-universe runs, and counts the `gbm_weekly` alias once. 15 of them have returns; the raw-target and weekly-bar CLAM runs left no usable scores. The DSR takes its variance from those 15 Sharpe ratios and uses N = 17. Searches I didn't log and correlation between trials would both raise the hurdle, so the trial count can only go up from here.
 

@@ -14,7 +14,8 @@ from sv import db
 def _panel(con, model: str | None = None) -> pd.DataFrame:
     q = """SELECT p.date, p.ticker, p.ret_fwd_1w, p.ret_fwd_1w_lag1, s.score
            FROM panel p LEFT JOIN signals s ON s.date = p.date AND s.ticker = p.ticker AND s.model = $m
-           WHERE p.tradable AND p.date <= $end AND p.date IN (SELECT date FROM panel WHERE ticker = 'SPY' AND ret_fwd_1w_lag1 IS NOT NULL)"""
+           WHERE p.tradable AND p.date <= $end AND p.date IN (SELECT date FROM panel WHERE ticker = 'SPY' AND ret_fwd_1w_lag1 IS NOT NULL)
+           ORDER BY p.date, p.ticker"""  # same row order every run, so the permutation test repeats exactly
     return db.read(con, q, {"m": model, "end": config.EVALUATION_END})
 
 

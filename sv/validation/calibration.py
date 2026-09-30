@@ -18,7 +18,7 @@ def evaluate(con):
     }
     for model,(target,horizon,description) in specs.items():
         end_dates = pd.Series(calendar,index=calendar).shift(-horizon)
-        scores=db.read(con,"SELECT s.date,s.ticker,s.score FROM signals s JOIN panel p USING(date,ticker) WHERE s.model=$m AND p.tradable AND s.date >= $start AND s.date <= $end",{'m':model,'start':config.OOT_START,'end':config.EVALUATION_END})
+        scores=db.read(con,"SELECT s.date,s.ticker,s.score FROM signals s JOIN panel p USING(date,ticker) WHERE s.model=$m AND p.tradable AND s.date >= $start AND s.date <= $end ORDER BY s.date, s.ticker",{'m':model,'start':config.OOT_START,'end':config.EVALUATION_END})
         target=target.reindex(pd.DatetimeIndex(scores.date.unique()).sort_values())
         actual=target.stack(future_stack=True).rename('actual').reset_index()
         actual.columns=['date','ticker','actual']

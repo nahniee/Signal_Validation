@@ -1,16 +1,11 @@
 __pycache__/
 *.pyc
 .venv/
-data/*.duckdb
-data/*.duckdb.wal
-data/cache/
-data/raw/*.csv
-data/raw/*.json
+data/
 models/*.h5
 models/*.keras
 .env
 .DS_Store
 .ipynb_checkpoints/
 reports/*.html
-data/*.log
 models/*.pkl
