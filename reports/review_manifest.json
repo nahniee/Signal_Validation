@@ -21,7 +21,7 @@
     "Signal_Validation/sv/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "Signal_Validation/sv/db.py": "6f8aa7658836853045941262a18d883d5a21a29954ae23e5c947914189576dec",
     "Signal_Validation/sv/ingest.py": "98082fb3f3cdecef99dd22e199c1c62f83cc53ff62b062fe0f25b841f3d00b6e",
-    "Signal_Validation/sv/backtest.py": "2d726f936ddfcbf66ddcd2de0d9e1cf7e63d298ae1ad22bbf88d46b1e6672c27",
+    "Signal_Validation/sv/backtest.py": "758157ab736d87d454c70233816c05e9c696a004cec39c08c3acc791e2406622",
     "Signal_Validation/sv/candidates/clam.py": "b6e6d040dc46e67c20e12469e7b939dd46baff91df46a7b807f80c84600940d5",
     "Signal_Validation/sv/candidates/gbm.py": "a0f79b4a9b140c679ea4fcf06fc90c3ec626a960d0b2342e33dffde6c5f6df0c",
     "Signal_Validation/sv/candidates/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
