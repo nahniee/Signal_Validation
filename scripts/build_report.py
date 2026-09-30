@@ -296,7 +296,7 @@ The structure follows the conceptual-soundness, monitoring and outcome-analysis 
               'historical_weights_unchanged':True,'new_training_runs':['n94_seed20260922','n500_seed20260922','n3000_seed20260922'],'gbm_weekly_alias':'gbm_w_126_expected','sha256':{}}
     for p in (list((config.ROOT/'sv').rglob('*.py')) + list((config.ROOT/'scripts').glob('*.py'))
               + list((config.ROOT/'sql').rglob('*.sql')) + [config.ROOT/'config.py',config.ROOT/'experiments.json',
-              config.QMR_DIR/'clam_model.py',config.QMR_DIR/'clam_weekly.py']
+              config.QMR_DIR/'clam_model.py',config.QMR_DIR/'clam_weekly.py',config.QMR_DIR/'gbm_weekly.py']
               + list(config.MODELS_DIR.glob('*')) + list(config.QMR_DIR.glob('clam_weekly/*/*.keras'))):
         manifest['sha256'][str(p.relative_to(config.ROOT.parent))]=hashlib.sha256(p.read_bytes()).hexdigest()
     (root/'review_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

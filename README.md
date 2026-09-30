@@ -2,7 +2,7 @@
 
 I built a GBM ranking model and a CNN-LSTM forecaster (CLAM) for a weekly trading bot, then went back and reviewed them the way a bank's model risk team would. The developer and the reviewer are the same person here, so this is a self-review that follows a second-line structure. It isn't independent validation.
 
-Related repos: [Quant_Model_Research](https://github.com/nahniee/Quant_Model_Research) (CLAM) and [Long_Term_Trading](https://github.com/nahniee/Long_Term_Trading) (GBM and the bot).
+Related repos: [Quant_Model_Research](https://github.com/nahniee/Quant_Model_Research) (model research and the weekly rebuilds) and [Long_Term_Trading](https://github.com/nahniee/Long_Term_Trading) (the bot).
 
 ## What happened
 
@@ -38,7 +38,7 @@ Outputs: `reports/oot_*.csv`, `latest_monitoring.csv`, `matched_calibration.csv`
 
 Install `requirements.txt` in Python 3.12. `sv.universe`, `sv.ingest` and `sv.features` download and build a new snapshot, which will differ from the one used here, so keep the original if you want to compare.
 
-Training the original CLAM now uses the corrected direction metric by default. `scripts/retrain_clam.py` asks for the old metric on purpose, because it rebuilds the original method as it was, cross-ticker windows included. The weekly redevelopment lives in `../Quant_Model_Research/clam_weekly.py`. Any retrain, re-selection or new variant should get its own version, a new line in the experiment log and evaluation data it hasn't seen. `scripts/develop_gbm_weekly.py` is for development and isn't part of the frozen review.
+Training the original CLAM now uses the corrected direction metric by default. `scripts/retrain_clam.py` asks for the old metric on purpose, because it rebuilds the original method as it was, cross-ticker windows included. The weekly rebuilds live in `../Quant_Model_Research/` as `gbm_weekly.py` and `clam_weekly.py`. Any retrain, re-selection or new variant should get its own version, a new line in the experiment log and evaluation data it hasn't seen. `scripts/develop_gbm_weekly.py` is for development and isn't part of the frozen review.
 
 ## Limitations
 

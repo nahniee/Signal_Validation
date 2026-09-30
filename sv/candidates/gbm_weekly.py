@@ -1,4 +1,4 @@
-"""Weekly GBM scores, vectorised from Long_Term_Trading/gbm_weekly.py.
+"""Weekly GBM scores, vectorised from Quant_Model_Research/gbm_weekly.py.
 
 Six variants are emitted: lookback 63, 126 or 252 days by expected-return or
 probability-of-gain score. The variant chosen on the development sample is aliased as
